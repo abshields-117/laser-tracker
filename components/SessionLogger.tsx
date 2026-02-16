@@ -1,14 +1,25 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Save, Calendar, User, Zap } from 'lucide-react';
+import { Save, Calendar, User, Zap, AlertTriangle } from 'lucide-react';
 
 export default function SessionLogger() {
   const [patient] = useState({ name: 'Sarah Smith', skinType: 'III', package: 'The Essential Duo' });
   const [session, setSession] = useState(4);
   const totalSessions = 8;
+  const [skinCheck, setSkinCheck] = useState({ rechecked: false, type: 'III' });
+
+  // Mock previous session data (This would come from DB)
+  const previousSession = {
+    shotsAlex: 1250,
+    shotsYag: 450
+  };
 
   const handleSave = () => {
+    if (!skinCheck.rechecked) {
+      alert("Please confirm the Fitzpatrick Skin Type before saving.");
+      return;
+    }
     alert("Session Saved! Next Appointment: April 12, 2026");
   };
 
@@ -23,7 +34,7 @@ export default function SessionLogger() {
               <User className="w-6 h-6 text-blue-600" />
               {patient.name}
             </h1>
-            <p className="text-slate-500 mt-1">Fitzpatrick Type: <span className="font-semibold text-slate-800">{patient.skinType}</span></p>
+            <p className="text-slate-500 mt-1">Baseline: Type <span className="font-semibold text-slate-800">{patient.skinType}</span></p>
           </div>
           <div className="text-right">
             <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold uppercase tracking-wide">
@@ -47,8 +58,42 @@ export default function SessionLogger() {
         </div>
       </div>
 
+      {/* Safety Check: Mandatory Re-Type */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-3">
+        <div className="flex items-center gap-2 text-amber-800 font-semibold">
+          <AlertTriangle className="w-5 h-5" />
+          Mandatory Safety Check
+        </div>
+        <p className="text-sm text-amber-700">Verify patient's skin type (look for new tan/sun exposure).</p>
+        
+        <div className="flex items-center gap-4">
+          <select 
+            className="p-2 border border-amber-300 rounded bg-white text-sm"
+            value={skinCheck.type}
+            onChange={(e) => setSkinCheck({ ...skinCheck, type: e.target.value })}
+          >
+            <option value="I">Type I</option>
+            <option value="II">Type II</option>
+            <option value="III">Type III</option>
+            <option value="IV">Type IV</option>
+            <option value="V">Type V</option>
+            <option value="VI">Type VI</option>
+          </select>
+          
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={skinCheck.rechecked}
+              onChange={(e) => setSkinCheck({ ...skinCheck, rechecked: e.target.checked })}
+              className="w-4 h-4 text-amber-600 rounded" 
+            />
+            <span className="text-sm font-medium text-amber-900">I have examined the skin today.</span>
+          </label>
+        </div>
+      </div>
+
       {/* Treatment Form */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 transition-opacity ${!skinCheck.rechecked ? 'opacity-50 pointer-events-none' : ''}`}>
         <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
           <Zap className="w-5 h-5 text-amber-500" />
           Treatment Settings (Splendor X)
@@ -82,6 +127,19 @@ export default function SessionLogger() {
             <label className="text-sm font-medium text-slate-700">Pulse Width (ms)</label>
             <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="20" />
           </div>
+
+          {/* New Shots Fired Section */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">Total Shots (Alex)</label>
+            <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
+            <p className="text-xs text-slate-500">Previous: {previousSession.shotsAlex}</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">Total Shots (Nd:YAG)</label>
+            <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
+            <p className="text-xs text-slate-500">Previous: {previousSession.shotsYag}</p>
+          </div>
         </div>
 
         <div className="mt-6 space-y-2">
@@ -105,7 +163,8 @@ export default function SessionLogger() {
 
         <button 
           onClick={handleSave}
-          className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
+          disabled={!skinCheck.rechecked}
+          className="w-full mt-6 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
         >
           <Save className="w-5 h-5" />
           Log Session & Schedule Next

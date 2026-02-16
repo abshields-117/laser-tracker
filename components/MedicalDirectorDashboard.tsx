@@ -25,7 +25,7 @@ export default function MedicalDirectorDashboard() {
           <User className="w-8 h-8 text-blue-400" />
           Medical Director Oversight
         </h1>
-        <p className="text-slate-400 mt-1">Dr. Alison Shields, DDS • License #12345</p>
+        <p className="text-slate-400 mt-1">Adam Bendorf, DO • License #12345</p>
       </div>
 
       {/* Action Queue */}
