@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Save, Calendar, User, Zap, AlertTriangle } from 'lucide-react';
+import { Save, Calendar, User, Zap, AlertTriangle, Sun } from 'lucide-react';
 
 export default function SessionLogger() {
   const [patient] = useState({ name: 'Sarah Smith', skinType: 'III', package: 'The Essential Duo' });
   const [session, setSession] = useState(4);
   const totalSessions = 8;
-  const [skinCheck, setSkinCheck] = useState({ rechecked: false, type: 'III' });
+  const [skinCheck, setSkinCheck] = useState({ rechecked: false, type: 'III', sunExposure: false });
 
   // Mock previous session data (This would come from DB)
   const previousSession = {
@@ -18,6 +18,10 @@ export default function SessionLogger() {
   const handleSave = () => {
     if (!skinCheck.rechecked) {
       alert("Please confirm the Fitzpatrick Skin Type before saving.");
+      return;
+    }
+    if (skinCheck.sunExposure) {
+      alert("WARNING: Recent sun exposure reported. Treatment may need to be postponed.");
       return;
     }
     alert("Session Saved! Next Appointment: April 12, 2026");
@@ -58,42 +62,80 @@ export default function SessionLogger() {
         </div>
       </div>
 
-      {/* Safety Check: Mandatory Re-Type */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-3">
-        <div className="flex items-center gap-2 text-amber-800 font-semibold">
+      {/* Safety Check: Mandatory Re-Type & Sun Exposure */}
+      <div className={`bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-3 ${skinCheck.sunExposure ? 'bg-red-50 border-red-200' : ''}`}>
+        <div className={`flex items-center gap-2 font-semibold ${skinCheck.sunExposure ? 'text-red-700' : 'text-amber-800'}`}>
           <AlertTriangle className="w-5 h-5" />
           Mandatory Safety Check
         </div>
-        <p className="text-sm text-amber-700">Verify patient's skin type (look for new tan/sun exposure).</p>
         
-        <div className="flex items-center gap-4">
-          <select 
-            className="p-2 border border-amber-300 rounded bg-white text-sm"
-            value={skinCheck.type}
-            onChange={(e) => setSkinCheck({ ...skinCheck, type: e.target.value })}
-          >
-            <option value="I">Type I</option>
-            <option value="II">Type II</option>
-            <option value="III">Type III</option>
-            <option value="IV">Type IV</option>
-            <option value="V">Type V</option>
-            <option value="VI">Type VI</option>
-          </select>
-          
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input 
-              type="checkbox" 
-              checked={skinCheck.rechecked}
-              onChange={(e) => setSkinCheck({ ...skinCheck, rechecked: e.target.checked })}
-              className="w-4 h-4 text-amber-600 rounded" 
-            />
-            <span className="text-sm font-medium text-amber-900">I have examined the skin today.</span>
-          </label>
+        <div className="space-y-3">
+          {/* Sun Exposure Question */}
+          <div className="bg-white p-3 rounded-lg border border-amber-100 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <Sun className="w-4 h-4 text-orange-500" />
+              Has the patient had recent sun exposure / tanning?
+            </div>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input 
+                  type="radio" 
+                  name="sun" 
+                  checked={skinCheck.sunExposure === true}
+                  onChange={() => setSkinCheck({ ...skinCheck, sunExposure: true })}
+                  className="w-4 h-4 text-red-600" 
+                />
+                <span className="text-sm font-bold text-red-600">YES</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input 
+                  type="radio" 
+                  name="sun" 
+                  checked={skinCheck.sunExposure === false}
+                  onChange={() => setSkinCheck({ ...skinCheck, sunExposure: false })}
+                  className="w-4 h-4 text-green-600" 
+                />
+                <span className="text-sm font-bold text-green-600">NO</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Skin Type Check */}
+          <div className="flex items-center gap-4">
+            <select 
+              className="p-2 border border-amber-300 rounded bg-white text-sm"
+              value={skinCheck.type}
+              onChange={(e) => setSkinCheck({ ...skinCheck, type: e.target.value })}
+            >
+              <option value="I">Type I</option>
+              <option value="II">Type II</option>
+              <option value="III">Type III</option>
+              <option value="IV">Type IV</option>
+              <option value="V">Type V</option>
+              <option value="VI">Type VI</option>
+            </select>
+            
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={skinCheck.rechecked}
+                onChange={(e) => setSkinCheck({ ...skinCheck, rechecked: e.target.checked })}
+                className="w-4 h-4 text-amber-600 rounded" 
+              />
+              <span className="text-sm font-medium text-amber-900">I have examined the skin today.</span>
+            </label>
+          </div>
         </div>
+
+        {skinCheck.sunExposure && (
+          <div className="text-red-600 text-sm font-bold flex items-center gap-2 mt-2 bg-red-100 p-2 rounded">
+            🛑 STOP: Treatment contraindicated. Consult Medical Director.
+          </div>
+        )}
       </div>
 
-      {/* Treatment Form */}
-      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 transition-opacity ${!skinCheck.rechecked ? 'opacity-50 pointer-events-none' : ''}`}>
+      {/* Treatment Form - Locked if Sun Exposure is YES or Checkbox is unchecked */}
+      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 transition-opacity ${(!skinCheck.rechecked || skinCheck.sunExposure) ? 'opacity-50 pointer-events-none' : ''}`}>
         <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
           <Zap className="w-5 h-5 text-amber-500" />
           Treatment Settings (Splendor X)
