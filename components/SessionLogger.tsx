@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Save, Calendar, User, Zap, AlertTriangle, Sun } from 'lucide-react';
+import { Save, Calendar, User, Zap, AlertTriangle, Sun, Gauge, Thermometer } from 'lucide-react';
 
 export default function SessionLogger() {
   const [patient] = useState({ name: 'Sarah Smith', skinType: 'III', package: 'The Essential Duo' });
@@ -18,8 +18,6 @@ export default function SessionLogger() {
   };
 
   // Logic: Is the treatment safe?
-  // If Sun Exposure is YES, but the treated area is NOT in the exposed list -> SAFE.
-  // If Treated Area IS in exposed list -> UNSAFE.
   const isTreatmentBlocked = skinCheck.sunExposure && exposedAreas.includes(areaTreated);
 
   const handleSave = () => {
@@ -43,7 +41,7 @@ export default function SessionLogger() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6">
+    <div className="max-w-2xl mx-auto p-6 space-y-6 pb-20">
       
       {/* Header Card */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -90,13 +88,12 @@ export default function SessionLogger() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                 <Sun className="w-4 h-4 text-orange-500" />
-                Has the patient had recent sun exposure / tanning?
+                Recent sun exposure / tanning?
               </div>
               <div className="flex gap-4">
                 <label className="flex items-center gap-1 cursor-pointer">
                   <input 
-                    type="radio" 
-                    name="sun" 
+                    type="radio" name="sun" 
                     checked={skinCheck.sunExposure === true}
                     onChange={() => setSkinCheck({ ...skinCheck, sunExposure: true })}
                     className="w-4 h-4 text-red-600" 
@@ -105,8 +102,7 @@ export default function SessionLogger() {
                 </label>
                 <label className="flex items-center gap-1 cursor-pointer">
                   <input 
-                    type="radio" 
-                    name="sun" 
+                    type="radio" name="sun" 
                     checked={skinCheck.sunExposure === false}
                     onChange={() => {
                       setSkinCheck({ ...skinCheck, sunExposure: false });
@@ -216,30 +212,64 @@ export default function SessionLogger() {
             <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="20" />
           </div>
 
-          {/* New Shots Fired Section */}
+          {/* New Clinical Fields (v2.5) */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Total Shots (Alex)</label>
-            <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
-            <p className="text-xs text-slate-500">Previous: {previousSession.shotsAlex}</p>
+            <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+              <Gauge className="w-4 h-4 text-slate-400" />
+              Overlap (%)
+            </label>
+            <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
+              <option>10%</option>
+              <option>15% (Recommended)</option>
+              <option>20%</option>
+              <option>25%</option>
+            </select>
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Total Shots (Nd:YAG)</label>
-            <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
-            <p className="text-xs text-slate-500">Previous: {previousSession.shotsYag}</p>
+            <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+              <Thermometer className="w-4 h-4 text-slate-400" />
+              Cooling (Zimmer)
+            </label>
+            <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
+              <option>High (Level 5-6)</option>
+              <option>Medium (Level 3-4)</option>
+              <option>Low (Level 1-2)</option>
+            </select>
+          </div>
+
+          {/* Shots Fired Section */}
+          <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Alex (755nm)</label>
+              <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
+              <p className="text-xs text-slate-400">Prev: {previousSession.shotsAlex}</p>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Nd:YAG (1064nm)</label>
+              <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
+              <p className="text-xs text-slate-400">Prev: {previousSession.shotsYag}</p>
+            </div>
           </div>
         </div>
 
-        <div className="mt-6 space-y-2">
-          <label className="text-sm font-medium text-slate-700">Skin Reaction</label>
+        <div className="mt-6 space-y-3">
+          <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            Clinical Endpoint Reached?
+            <span className="text-xs font-normal text-slate-500">(Must observe PFE/Erythema)</span>
+          </label>
           <div className="flex gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" />
-              <span className="text-sm text-slate-600">Mild Erythema (Redness)</span>
+            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-blue-300">
+              <input type="radio" name="endpoint" className="w-4 h-4 text-blue-600" />
+              <span className="text-sm text-slate-700">Mild Erythema</span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" className="w-4 h-4 text-blue-600 rounded" />
-              <span className="text-sm text-slate-600">PFE (Edema)</span>
+            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-blue-300">
+              <input type="radio" name="endpoint" className="w-4 h-4 text-blue-600" />
+              <span className="text-sm text-slate-700">PFE (Edema)</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-red-300">
+              <input type="radio" name="endpoint" className="w-4 h-4 text-red-600" />
+              <span className="text-sm text-slate-700">None / Poor Response</span>
             </label>
           </div>
         </div>
