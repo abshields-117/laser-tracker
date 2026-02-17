@@ -8,6 +8,8 @@ export default function SessionLogger() {
   const [session, setSession] = useState(4);
   const totalSessions = 8;
   const [skinCheck, setSkinCheck] = useState({ rechecked: false, type: 'III', sunExposure: false });
+  const [exposedAreas, setExposedAreas] = useState<string[]>([]);
+  const [areaTreated, setAreaTreated] = useState('Underarms');
 
   // Mock previous session data (This would come from DB)
   const previousSession = {
@@ -15,16 +17,29 @@ export default function SessionLogger() {
     shotsYag: 450
   };
 
+  // Logic: Is the treatment safe?
+  // If Sun Exposure is YES, but the treated area is NOT in the exposed list -> SAFE.
+  // If Treated Area IS in exposed list -> UNSAFE.
+  const isTreatmentBlocked = skinCheck.sunExposure && exposedAreas.includes(areaTreated);
+
   const handleSave = () => {
     if (!skinCheck.rechecked) {
       alert("Please confirm the Fitzpatrick Skin Type before saving.");
       return;
     }
-    if (skinCheck.sunExposure) {
-      alert("WARNING: Recent sun exposure reported. Treatment may need to be postponed.");
+    if (isTreatmentBlocked) {
+      alert(`WARNING: Recent sun exposure reported on ${areaTreated}. Treatment postponed.`);
       return;
     }
     alert("Session Saved! Next Appointment: April 12, 2026");
+  };
+
+  const toggleExposedArea = (area: string) => {
+    if (exposedAreas.includes(area)) {
+      setExposedAreas(exposedAreas.filter(a => a !== area));
+    } else {
+      setExposedAreas([...exposedAreas, area]);
+    }
   };
 
   return (
@@ -63,41 +78,66 @@ export default function SessionLogger() {
       </div>
 
       {/* Safety Check: Mandatory Re-Type & Sun Exposure */}
-      <div className={`bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-3 ${skinCheck.sunExposure ? 'bg-red-50 border-red-200' : ''}`}>
-        <div className={`flex items-center gap-2 font-semibold ${skinCheck.sunExposure ? 'text-red-700' : 'text-amber-800'}`}>
+      <div className={`bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-3 ${isTreatmentBlocked ? 'bg-red-50 border-red-200' : ''}`}>
+        <div className={`flex items-center gap-2 font-semibold ${isTreatmentBlocked ? 'text-red-700' : 'text-amber-800'}`}>
           <AlertTriangle className="w-5 h-5" />
           Mandatory Safety Check
         </div>
         
         <div className="space-y-3">
           {/* Sun Exposure Question */}
-          <div className="bg-white p-3 rounded-lg border border-amber-100 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-              <Sun className="w-4 h-4 text-orange-500" />
-              Has the patient had recent sun exposure / tanning?
+          <div className="bg-white p-3 rounded-lg border border-amber-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <Sun className="w-4 h-4 text-orange-500" />
+                Has the patient had recent sun exposure / tanning?
+              </div>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input 
+                    type="radio" 
+                    name="sun" 
+                    checked={skinCheck.sunExposure === true}
+                    onChange={() => setSkinCheck({ ...skinCheck, sunExposure: true })}
+                    className="w-4 h-4 text-red-600" 
+                  />
+                  <span className="text-sm font-bold text-red-600">YES</span>
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input 
+                    type="radio" 
+                    name="sun" 
+                    checked={skinCheck.sunExposure === false}
+                    onChange={() => {
+                      setSkinCheck({ ...skinCheck, sunExposure: false });
+                      setExposedAreas([]); // Clear areas if NO sun
+                    }}
+                    className="w-4 h-4 text-green-600" 
+                  />
+                  <span className="text-sm font-bold text-green-600">NO</span>
+                </label>
+              </div>
             </div>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-1 cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="sun" 
-                  checked={skinCheck.sunExposure === true}
-                  onChange={() => setSkinCheck({ ...skinCheck, sunExposure: true })}
-                  className="w-4 h-4 text-red-600" 
-                />
-                <span className="text-sm font-bold text-red-600">YES</span>
-              </label>
-              <label className="flex items-center gap-1 cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="sun" 
-                  checked={skinCheck.sunExposure === false}
-                  onChange={() => setSkinCheck({ ...skinCheck, sunExposure: false })}
-                  className="w-4 h-4 text-green-600" 
-                />
-                <span className="text-sm font-bold text-green-600">NO</span>
-              </label>
-            </div>
+
+            {/* If YES, Show Area Checklist */}
+            {skinCheck.sunExposure && (
+              <div className="mt-2 pt-2 border-t border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Select Exposed Areas:</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {['Face', 'Neck', 'Arms', 'Underarms', 'Legs', 'Back', 'Chest', 'Bikini'].map(area => (
+                    <label key={area} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                      <input 
+                        type="checkbox" 
+                        checked={exposedAreas.includes(area)}
+                        onChange={() => toggleExposedArea(area)}
+                        className="w-4 h-4 text-red-500 rounded border-slate-300"
+                      />
+                      <span className="text-sm text-slate-700">{area}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Skin Type Check */}
@@ -127,15 +167,15 @@ export default function SessionLogger() {
           </div>
         </div>
 
-        {skinCheck.sunExposure && (
-          <div className="text-red-600 text-sm font-bold flex items-center gap-2 mt-2 bg-red-100 p-2 rounded">
-            🛑 STOP: Treatment contraindicated. Consult Medical Director.
+        {isTreatmentBlocked && (
+          <div className="text-red-600 text-sm font-bold flex items-center gap-2 mt-2 bg-red-100 p-2 rounded animate-pulse">
+            🛑 STOP: Sun exposure detected on {areaTreated}. Treatment Blocked.
           </div>
         )}
       </div>
 
-      {/* Treatment Form - Locked if Sun Exposure is YES or Checkbox is unchecked */}
-      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 transition-opacity ${(!skinCheck.rechecked || skinCheck.sunExposure) ? 'opacity-50 pointer-events-none' : ''}`}>
+      {/* Treatment Form - Locked if Blocked or Unchecked */}
+      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 transition-opacity ${(!skinCheck.rechecked || isTreatmentBlocked) ? 'opacity-50 pointer-events-none' : ''}`}>
         <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
           <Zap className="w-5 h-5 text-amber-500" />
           Treatment Settings (Splendor X)
@@ -144,10 +184,16 @@ export default function SessionLogger() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">Area Treated</label>
-            <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
-              <option>Underarms</option>
-              <option>Brazilian</option>
-              <option>Full Legs</option>
+            <select 
+              className="w-full p-2 border border-slate-300 rounded-md bg-white"
+              value={areaTreated}
+              onChange={(e) => setAreaTreated(e.target.value)}
+            >
+              <option value="Underarms">Underarms</option>
+              <option value="Bikini">Bikini / Brazilian</option>
+              <option value="Legs">Full Legs</option>
+              <option value="Back">Back</option>
+              <option value="Face">Face</option>
             </select>
           </div>
 
