@@ -5,10 +5,11 @@ import SessionLogger from '@/components/SessionLogger';
 import PatientSearch from '@/components/PatientSearch';
 import MedicalDirectorDashboard from '@/components/MedicalDirectorDashboard';
 import PatientPortal from '@/components/PatientPortal';
-import { User, Activity, ShieldCheck, LogOut } from 'lucide-react';
+import IntakeForm from '@/components/IntakeForm';
+import { User, Activity, ShieldCheck, LogOut, FileText } from 'lucide-react';
 
 export default function Home() {
-  const [view, setView] = useState<'home' | 'search' | 'logger' | 'md' | 'patient'>('home');
+  const [view, setView] = useState<'home' | 'search' | 'logger' | 'md' | 'patient' | 'intake'>('home');
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
 
   // Role Switcher (Simulated Login)
@@ -49,6 +50,19 @@ export default function Home() {
             </button>
 
             <button 
+              onClick={() => setView('intake')}
+              className="w-full p-6 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all group flex items-center gap-4 text-left"
+            >
+              <div className="bg-purple-500/10 p-3 rounded-lg group-hover:bg-purple-500/20">
+                <FileText className="w-6 h-6 text-purple-400" />
+              </div>
+              <div>
+                <span className="block text-lg font-semibold text-white">New Patient Intake</span>
+                <span className="text-sm text-slate-400">Fill History & Sign Consent</span>
+              </div>
+            </button>
+
+            <button 
               onClick={() => setView('patient')}
               className="w-full p-6 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all group flex items-center gap-4 text-left"
             >
@@ -56,13 +70,13 @@ export default function Home() {
                 <Activity className="w-6 h-6 text-green-400" />
               </div>
               <div>
-                <span className="block text-lg font-semibold text-white">Patient Portal</span>
-                <span className="text-sm text-slate-400">View progress & sign forms</span>
+                <span className="block text-lg font-semibold text-white">My Portal (Demo)</span>
+                <span className="text-sm text-slate-400">View progress & next appt</span>
               </div>
             </button>
           </div>
           
-          <p className="text-center text-xs text-slate-600 mt-8">v2.0 Beta • HIPAA Compliant Prototype</p>
+          <p className="text-center text-xs text-slate-600 mt-8">v2.4 Beta • HIPAA Compliant Prototype</p>
         </div>
       </main>
     );
@@ -105,6 +119,8 @@ export default function Home() {
       {view === 'md' && <MedicalDirectorDashboard />}
       
       {view === 'patient' && <PatientPortal />}
+
+      {view === 'intake' && <IntakeForm />}
 
     </main>
   );
