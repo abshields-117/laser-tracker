@@ -164,8 +164,7 @@ export default function IntakeForm() {
           <div className="h-40 overflow-y-auto p-3 bg-slate-50 rounded border border-slate-200 text-xs text-slate-600 space-y-2">
             <p><strong>1. Risks:</strong> I understand laser hair removal may cause redness, swelling, blistering, or changes in skin pigment.</p>
             <p><strong>2. Results:</strong> I understand that multiple sessions are required and permanent reduction is not guaranteed.</p>
-            <p><strong>3. Sun Exposure:</strong> I agree to avoid sun exposure 4 weeks before and after treatment.</p>
-            <p><strong>4. Financial:</strong> I understand payment is due at time of service and packages are non-refundable.</p>
+            <p><strong>3. Financial:</strong> I understand payment is due at time of service and packages are non-refundable.</p>
           </div>
 
           <div className="space-y-2">
