@@ -8,6 +8,8 @@ export default function IntakeForm() {
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', dob: '', email: '', phone: '',
     skinType: 'III', // Patient self-selects (Tech confirms later)
+    desiredPackage: '',
+    desiredPackageOther: '',
     medical: {
       accutane: false,
       sunExposure: false,
@@ -16,6 +18,7 @@ export default function IntakeForm() {
       keloids: false,
       tattoos: false,
       cancer: false,
+      photosensitive: false,
       medications: ''
     },
     consent: {
@@ -26,6 +29,12 @@ export default function IntakeForm() {
     },
     signature: ''
   });
+
+  const packages = [
+    { group: "Female Packages", items: ["Smooth Face & Neck", "The Essential Duo", "The College Prep", "The Full Leg", "The Total Body"] },
+    { group: "Men's Packages", items: ["The Clean Neck", "The Athlete's Back", "Upper Body Complete"] },
+    { group: "Other", items: ["Other (Please specify)"] }
+  ];
 
   const handleNext = () => setStep(step + 1);
   const handleBack = () => setStep(step - 1);
@@ -61,14 +70,14 @@ export default function IntakeForm() {
             <div>
               <label className="block text-sm font-medium text-slate-700">First Name</label>
               <input 
-                type="text" className="w-full p-2 border rounded-md" 
+                type="text" className="w-full p-2 border rounded-md text-slate-900" 
                 value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700">Last Name</label>
               <input 
-                type="text" className="w-full p-2 border rounded-md" 
+                type="text" className="w-full p-2 border rounded-md text-slate-900" 
                 value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})}
               />
             </div>
@@ -77,7 +86,7 @@ export default function IntakeForm() {
           <div>
             <label className="block text-sm font-medium text-slate-700">Date of Birth</label>
             <input 
-              type="date" className="w-full p-2 border rounded-md" 
+              type="date" className="w-full p-2 border rounded-md text-slate-900" 
               value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})}
             />
           </div>
@@ -86,18 +95,46 @@ export default function IntakeForm() {
             <div>
               <label className="block text-sm font-medium text-slate-700">Email</label>
               <input 
-                type="email" className="w-full p-2 border rounded-md" 
+                type="email" className="w-full p-2 border rounded-md text-slate-900" 
                 value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700">Phone</label>
               <input 
-                type="tel" className="w-full p-2 border rounded-md" 
+                type="tel" className="w-full p-2 border rounded-md text-slate-900" 
                 value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
               />
             </div>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">Package Desired</label>
+            <select 
+              className="w-full p-2 border rounded-md text-slate-900 bg-white"
+              value={formData.desiredPackage}
+              onChange={e => setFormData({...formData, desiredPackage: e.target.value})}
+            >
+              <option value="">Select a package...</option>
+              {packages.map(group => (
+                <optgroup key={group.group} label={group.group}>
+                  {group.items.map(item => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          {formData.desiredPackage === 'Other (Please specify)' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Specify Package/Area</label>
+              <input 
+                type="text" className="w-full p-2 border rounded-md text-slate-900" 
+                value={formData.desiredPackageOther} onChange={e => setFormData({...formData, desiredPackageOther: e.target.value})}
+              />
+            </div>
+          )}
 
           <button onClick={handleNext} className="w-full mt-4 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 flex items-center justify-center gap-2">
             Next: Medical History <ChevronRight className="w-4 h-4" />
@@ -121,7 +158,8 @@ export default function IntakeForm() {
               { key: 'pregnant', label: 'Are you currently pregnant or breastfeeding?' },
               { key: 'herpesSimplex', label: 'Do you have a history of cold sores (Herpes Simplex)?' },
               { key: 'keloids', label: 'Do you have a history of keloid scarring?' },
-              { key: 'tattoos', label: 'Do you have tattoos or permanent makeup in the treatment area?' }
+              { key: 'tattoos', label: 'Do you have tattoos or permanent makeup in the treatment area?' },
+              { key: 'photosensitive', label: 'Are you taking any photosensitive meds, retinol, or retin-a?' }
             ].map(item => (
               <label key={item.key} className="flex items-start gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
                 <input 
@@ -139,7 +177,7 @@ export default function IntakeForm() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Current Medications</label>
             <textarea 
-              className="w-full p-2 border rounded-md h-20 text-sm" 
+              className="w-full p-2 border rounded-md h-20 text-sm text-slate-900" 
               placeholder="List all medications, vitamins, and supplements..."
               value={formData.medical.medications}
               onChange={e => setFormData({...formData, medical: {...formData.medical, medications: e.target.value}})}
@@ -190,7 +228,7 @@ export default function IntakeForm() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Digital Signature</label>
             <input 
               type="text" 
-              className="w-full p-3 border-b-2 border-slate-300 bg-slate-50 focus:border-blue-500 outline-none font-serif italic text-lg"
+              className="w-full p-3 border-b-2 border-slate-300 bg-slate-50 focus:border-blue-500 outline-none font-serif italic text-lg text-slate-900"
               placeholder="Type your full name to sign"
               value={formData.signature}
               onChange={e => setFormData({...formData, signature: e.target.value})}
