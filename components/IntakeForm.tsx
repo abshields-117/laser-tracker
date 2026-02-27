@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Save, AlertTriangle, CheckCircle, FileText, ChevronRight } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
+import { AlertTriangle, CheckCircle, FileText, ChevronRight, Loader2 } from 'lucide-react';
 
 export default function IntakeForm() {
   const [step, setStep] = useState(1);
@@ -39,10 +40,45 @@ export default function IntakeForm() {
   const handleNext = () => setStep(step + 1);
   const handleBack = () => setStep(step - 1);
 
-  const handleSubmit = () => {
-    alert("Intake Form Submitted! Thank you, " + formData.firstName);
-    // Here we would save to Supabase
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const { error } = await supabase.from('patients').insert({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        dob: formData.dob,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        baseline_skin_type: formData.skinType,
+        medical_clearance_status: false,
+      });
+
+      if (error) throw error;
+      setSubmitted(true);
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to submit intake form');
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (submitted) {
+    return (
+      <div className="max-w-xl mx-auto p-6 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
+          <h2 className="text-2xl font-bold text-slate-900">Intake Submitted!</h2>
+          <p className="text-slate-600">Thank you, {formData.firstName}. Your information has been saved.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-xl mx-auto p-6 bg-slate-50 min-h-screen">
@@ -236,14 +272,20 @@ export default function IntakeForm() {
             <p className="text-xs text-slate-400 mt-1">By typing your name, you agree this is a legal signature.</p>
           </div>
 
+          {submitError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">
+              {submitError}
+            </div>
+          )}
+
           <div className="flex gap-4 mt-4">
-            <button onClick={handleBack} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-lg font-semibold hover:bg-slate-200">Back</button>
+            <button onClick={handleBack} disabled={submitting} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-lg font-semibold hover:bg-slate-200 disabled:opacity-50">Back</button>
             <button 
               onClick={handleSubmit} 
-              disabled={!formData.signature || !formData.consent.risks}
-              className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed"
+              disabled={!formData.signature || !formData.consent.risks || submitting}
+              className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Submit Intake
+              {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</> : 'Submit Intake'}
             </button>
           </div>
         </div>

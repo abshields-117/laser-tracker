@@ -1,53 +1,128 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { useRouter } from 'next/navigation';
 import SessionLogger from '@/components/SessionLogger';
 import PatientSearch from '@/components/PatientSearch';
 import MedicalDirectorDashboard from '@/components/MedicalDirectorDashboard';
 import PatientPortal from '@/components/PatientPortal';
 import IntakeForm from '@/components/IntakeForm';
-import { User, Activity, ShieldCheck, LogOut, FileText } from 'lucide-react';
+import { User, Activity, ShieldCheck, LogOut, FileText, Loader2 } from 'lucide-react';
+
+type UserRole = 'admin' | 'md' | 'tech' | null;
 
 export default function Home() {
+  const router = useRouter();
   const [view, setView] = useState<'home' | 'search' | 'logger' | 'md' | 'patient' | 'intake'>('home');
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>(null);
+  const [userName, setUserName] = useState<string>('');
+  const [loading, setLoading] = useState(true);
 
-  // Role Switcher (Simulated Login)
+  useEffect(() => {
+    async function fetchUserProfile() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.push('/login');
+          return;
+        }
+
+        const { data: profile, error } = await supabase
+          .from('users')
+          .select('role, full_name, email')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Failed to fetch profile:', error);
+          // Fallback to auth metadata
+          setUserRole('tech');
+          setUserName(user.email ?? 'User');
+        } else {
+          setUserRole(profile.role as UserRole);
+          setUserName(profile.full_name ?? profile.email ?? 'User');
+        }
+      } catch (err) {
+        console.error('Auth error:', err);
+        router.push('/login');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchUserProfile();
+  }, [router]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  };
+
+  const roleLabel = (role: UserRole) => {
+    switch (role) {
+      case 'admin': return 'Administrator';
+      case 'md': return 'Medical Director';
+      case 'tech': return 'Technician';
+      default: return 'Staff';
+    }
+  };
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+      </main>
+    );
+  }
+
+  // Role Switcher / Home
   if (view === 'home') {
     return (
       <main className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <h1 className="text-3xl font-extrabold text-white tracking-tight">Harlan Laser Tracker</h1>
-            <p className="mt-2 text-slate-400">Select your role to continue.</p>
+            <p className="mt-1 text-slate-400">
+              Logged in as <span className="text-blue-400 font-medium">{roleLabel(userRole)}</span>
+            </p>
+            <p className="text-sm text-slate-500">{userName}</p>
           </div>
           
           <div className="grid gap-4">
-            <button 
-              onClick={() => setView('search')}
-              className="w-full p-6 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all group flex items-center gap-4 text-left"
-            >
-              <div className="bg-blue-500/10 p-3 rounded-lg group-hover:bg-blue-500/20">
-                <User className="w-6 h-6 text-blue-400" />
-              </div>
-              <div>
-                <span className="block text-lg font-semibold text-white">Staff / Tech</span>
-                <span className="text-sm text-slate-400">Log treatments & lookup patients</span>
-              </div>
-            </button>
+            {/* Techs and above can search patients */}
+            {(userRole === 'tech' || userRole === 'admin' || userRole === 'md') && (
+              <button 
+                onClick={() => setView('search')}
+                className="w-full p-6 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all group flex items-center gap-4 text-left"
+              >
+                <div className="bg-blue-500/10 p-3 rounded-lg group-hover:bg-blue-500/20">
+                  <User className="w-6 h-6 text-blue-400" />
+                </div>
+                <div>
+                  <span className="block text-lg font-semibold text-white">Staff / Tech</span>
+                  <span className="text-sm text-slate-400">Log treatments & lookup patients</span>
+                </div>
+              </button>
+            )}
 
-            <button 
-              onClick={() => setView('md')}
-              className="w-full p-6 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all group flex items-center gap-4 text-left"
-            >
-              <div className="bg-amber-500/10 p-3 rounded-lg group-hover:bg-amber-500/20">
-                <ShieldCheck className="w-6 h-6 text-amber-400" />
-              </div>
-              <div>
-                <span className="block text-lg font-semibold text-white">Medical Director</span>
-                <span className="text-sm text-slate-400">Review charts & approve safety</span>
-              </div>
-            </button>
+            {/* Only MD and Admin see the MD dashboard */}
+            {(userRole === 'md' || userRole === 'admin') && (
+              <button 
+                onClick={() => setView('md')}
+                className="w-full p-6 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all group flex items-center gap-4 text-left"
+              >
+                <div className="bg-amber-500/10 p-3 rounded-lg group-hover:bg-amber-500/20">
+                  <ShieldCheck className="w-6 h-6 text-amber-400" />
+                </div>
+                <div>
+                  <span className="block text-lg font-semibold text-white">Medical Director</span>
+                  <span className="text-sm text-slate-400">Review charts & approve safety</span>
+                </div>
+              </button>
+            )}
 
             <button 
               onClick={() => setView('intake')}
@@ -75,8 +150,18 @@ export default function Home() {
               </div>
             </button>
           </div>
+
+          <div className="flex justify-center">
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign Out
+            </button>
+          </div>
           
-          <p className="text-center text-xs text-slate-600 mt-8">v2.4 Beta • HIPAA Compliant Prototype</p>
+          <p className="text-center text-xs text-slate-600">v2.4 Beta • HIPAA Compliant Prototype</p>
         </div>
       </main>
     );
@@ -86,15 +171,18 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-slate-50 relative">
       
-      {/* Top Nav (Logout) */}
-      <div className="absolute top-4 left-4 z-50">
+      {/* Top Nav */}
+      <div className="absolute top-4 left-4 z-50 flex items-center gap-3">
         <button 
           onClick={() => setView('home')}
           className="bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-sm hover:bg-slate-100 border border-slate-200 text-slate-500"
-          title="Log Out"
+          title="Back to Home"
         >
           <LogOut className="w-5 h-5" />
         </button>
+        <span className="text-xs text-slate-400 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full border border-slate-200">
+          {roleLabel(userRole)}
+        </span>
       </div>
 
       {view === 'search' && (
