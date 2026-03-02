@@ -60,8 +60,19 @@ export default function IntakeForm() {
     'Hispanic/Latino', 'Middle Eastern', 'Native American', 'Pacific Islander', 'Other'
   ];
 
-  const handleNext = () => setStep(step + 1);
-  const handleBack = () => setStep(step - 1);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const handleNext = () => {
+    setValidationError(null);
+    if (step === 1) {
+      if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.dob || !formData.ethnicBackground || !formData.phone.trim() || !formData.email.trim() || !formData.desiredPackage) {
+        setValidationError('Please fill in all required fields before continuing.');
+        return;
+      }
+    }
+    setStep(step + 1);
+  };
+  const handleBack = () => { setValidationError(null); setStep(step - 1); };
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -216,6 +227,12 @@ export default function IntakeForm() {
             </div>
           )}
 
+          {validationError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">
+              {validationError}
+            </div>
+          )}
+
           <button onClick={handleNext} className="w-full mt-4 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 flex items-center justify-center gap-2">
             Next: Medical History <ChevronRight className="w-4 h-4" />
           </button>
@@ -316,7 +333,7 @@ export default function IntakeForm() {
             <button onClick={handleBack} disabled={submitting} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-lg font-semibold hover:bg-slate-200 disabled:opacity-50">Back</button>
             <button 
               onClick={handleSubmit} 
-              disabled={!formData.signature || !formData.consent.risks || submitting}
+              disabled={!formData.signature || !formData.consent.risks || !formData.consent.payment || submitting}
               className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</> : 'Submit Intake'}
