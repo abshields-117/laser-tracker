@@ -26,6 +26,7 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
   const [skinCheck, setSkinCheck] = useState({ rechecked: false, type: 'III', sunExposure: false });
   const [treatedAreas, setTreatedAreas] = useState<string[]>(['Underarms']);
   const [otherTreatedArea, setOtherTreatedArea] = useState('');
+  const [sunExposedAreas, setSunExposedAreas] = useState<string[]>([]);
   const [fluence, setFluence] = useState('');
   const [spotSize, setSpotSize] = useState('');
   const [notes, setNotes] = useState('');
@@ -97,6 +98,7 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
         fluence_jcm2: fluence ? parseFloat(fluence) : null,
         skin_type_at_session: skinCheck.type,
         sun_exposure_check: skinCheck.sunExposure,
+        sun_exposed_areas: skinCheck.sunExposure ? sunExposedAreas : null,
         spot_size: spotSize || null,
         notes: `Sun Exposure: ${skinCheck.sunExposure ? 'Yes' : 'No'}. ${notes}`
       });
@@ -157,7 +159,7 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Package Type</label>
-                <select className="w-full p-2 border border-slate-300 rounded-lg bg-white" value={selectedPackage} onChange={(e) => setSelectedPackage(e.target.value)}>
+                <select className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-900" value={selectedPackage} onChange={(e) => setSelectedPackage(e.target.value)}>
                   {PACKAGES.map((group) => (
                     <optgroup key={group.group} label={group.group}>
                       {group.items.map(item => <option key={item} value={item}>{item}</option>)}
@@ -176,7 +178,7 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
                   ))}
                 </div>
                 {treatedAreas.includes('Other') && (
-                  <input type="text" placeholder="Please specify area..." className="mt-3 w-full p-2 border border-slate-300 rounded-lg" value={otherTreatedArea} onChange={(e) => setOtherTreatedArea(e.target.value)} />
+                  <input type="text" placeholder="Please specify area..." className="mt-3 w-full p-2 border border-slate-300 rounded-lg text-slate-900" value={otherTreatedArea} onChange={(e) => setOtherTreatedArea(e.target.value)} />
                 )}
               </div>
             </div>
@@ -192,10 +194,22 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
                   <label htmlFor="sun" className="text-sm font-medium text-slate-700">Recent Sun Exposure / Self Tanner?</label>
                 </div>
                 {skinCheck.sunExposure && (
-                  <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 text-sm text-amber-800 flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600" />
-                    <p><strong>Caution:</strong> Assess skin carefully. Note exposure details in comments. Proceed with lower fluence if needed.</p>
-                  </div>
+                  <>
+                    <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 text-sm text-amber-800 flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600" />
+                      <p><strong>Caution:</strong> Assess skin carefully. Proceed with lower fluence if needed.</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Areas Exposed to Sun:</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {STANDARD_AREAS.map((area) => (
+                          <button key={area} onClick={() => setSunExposedAreas(prev => prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area])} className={`p-2 text-sm rounded-lg border text-left transition-colors ${sunExposedAreas.includes(area) ? 'bg-amber-50 border-amber-400 text-amber-800 font-medium shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                            {area}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
                 )}
              </div>
           </div>
@@ -212,16 +226,16 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
              <div className="grid grid-cols-2 gap-4">
                <div>
                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Fluence (J/cm²)</label>
-                 <input type="number" step="0.1" className="w-full p-3 font-mono text-lg border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" value={fluence} onChange={(e) => setFluence(e.target.value)} placeholder="e.g. 12" />
+                 <input type="number" step="0.1" className="w-full p-3 font-mono text-lg border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900" value={fluence} onChange={(e) => setFluence(e.target.value)} placeholder="e.g. 12" />
                </div>
                <div>
                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Spot Size (mm)</label>
-                 <input type="number" step="0.1" className="w-full p-3 font-mono text-lg border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" value={spotSize} onChange={(e) => setSpotSize(e.target.value)} placeholder="e.g. 18" />
+                 <input type="number" step="0.1" className="w-full p-3 font-mono text-lg border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-slate-900" value={spotSize} onChange={(e) => setSpotSize(e.target.value)} placeholder="e.g. 18" />
                </div>
              </div>
              <div className="mt-4">
                <label className="block text-sm font-semibold text-slate-700 mb-1">Clinical Notes & Observations</label>
-               <textarea rows={4} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" placeholder="Reaction, cooling level used, patient feedback..." value={notes} onChange={(e) => setNotes(e.target.value)}></textarea>
+               <textarea rows={4} className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none text-slate-900" placeholder="Reaction, cooling level used, patient feedback..." value={notes} onChange={(e) => setNotes(e.target.value)}></textarea>
              </div>
           </div>
 
