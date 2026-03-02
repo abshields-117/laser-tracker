@@ -47,7 +47,17 @@ interface PreChecklist {
   consentSigned: boolean;
 }
 
-// ─── Shared Sub-Components (outside main component to avoid remount) ─────────
+// ─── Shared Sub-Components (MUST be outside main component to avoid remount) ──
+
+const SectionCard = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
+  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="flex items-center gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200">
+      {icon}
+      <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">{title}</h3>
+    </div>
+    <div className="p-5">{children}</div>
+  </div>
+);
 
 const Label = ({ children }: { children: React.ReactNode }) => (
   <label className="text-sm font-semibold text-slate-700">{children}</label>
@@ -261,19 +271,7 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
     }
   };
 
-  // ─── Render Helpers ─────────────────────────────────────────────────────
-
-  const SectionCard = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="flex items-center gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200">
-        {icon}
-        <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">{title}</h3>
-      </div>
-      <div className="p-5">{children}</div>
-    </div>
-  );
-
-  // Label and NumberInput moved outside component to prevent re-mount on render
+  // SectionCard, Label, NumberInput all moved outside component
 
   // ─── Loading / Empty States ─────────────────────────────────────────────
 
