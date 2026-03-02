@@ -8,18 +8,22 @@ export default function IntakeForm() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', dob: '', email: '', phone: '',
-    skinType: 'III', // Patient self-selects (Tech confirms later)
+    ethnicBackground: '',
+    skinType: 'III',
     desiredPackage: '',
     desiredPackageOther: '',
     medical: {
-      accutane: false,
+      selfTanner: false,
       sunExposure: false,
+      accutane: false,
       pregnant: false,
+      recentBirth: false,
+      photosensitive: false,
+      antibiotics: false,
       herpesSimplex: false,
       keloids: false,
       tattoos: false,
       cancer: false,
-      photosensitive: false,
       medications: ''
     },
     consent: {
@@ -35,6 +39,25 @@ export default function IntakeForm() {
     { group: "Female Packages", items: ["Smooth Face & Neck", "The Essential Duo", "The College Prep", "The Full Leg", "The Total Body"] },
     { group: "Men's Packages", items: ["The Clean Neck", "The Athlete's Back", "Upper Body Complete"] },
     { group: "Other", items: ["Other (Please specify)"] }
+  ];
+
+  const medicalQuestions = [
+    { key: 'selfTanner', label: 'Have you used any self tanner in the last 7 days?' },
+    { key: 'sunExposure', label: 'Have you had prolonged sun exposure in the last 4 weeks?' },
+    { key: 'accutane', label: 'Have you taken Accutane in the last 6 months?' },
+    { key: 'pregnant', label: 'Are you currently pregnant or breastfeeding?' },
+    { key: 'recentBirth', label: 'Have you given birth in the last 12 months?' },
+    { key: 'photosensitive', label: 'Are you taking any photosensitive meds, retinol, or retin-a?' },
+    { key: 'antibiotics', label: 'Are you currently taking any antibiotics?' },
+    { key: 'herpesSimplex', label: 'Do you have a history of Herpes Simplex (Cold Sores)?' },
+    { key: 'keloids', label: 'Do you have a history of keloid scarring?' },
+    { key: 'tattoos', label: 'Do you have tattoos or permanent makeup in the treatment area?' },
+    { key: 'cancer', label: 'Do you have a history of skin cancer?' },
+  ];
+
+  const ethnicOptions = [
+    'Caucasian', 'African Descent', 'Asian', 'East Indian',
+    'Hispanic/Latino', 'Middle Eastern', 'Native American', 'Pacific Islander', 'Other'
   ];
 
   const handleNext = () => setStep(step + 1);
@@ -56,6 +79,8 @@ export default function IntakeForm() {
         email: formData.email || null,
         phone: formData.phone || null,
         baseline_skin_type: formData.skinType,
+        ethnic_background: formData.ethnicBackground,
+        medical_history_json: formData.medical,
         medical_clearance_status: false,
       });
 
@@ -74,7 +99,11 @@ export default function IntakeForm() {
         <div className="text-center space-y-4">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
           <h2 className="text-2xl font-bold text-slate-900">Intake Submitted!</h2>
-          <p className="text-slate-600">Thank you, {formData.firstName}. Your information has been saved.</p><p className="text-lg font-bold text-slate-800 mt-8">Please return the iPad to the front desk.</p><button onClick={() => window.location.reload()} className="mt-12 text-xs text-slate-300 hover:text-slate-500">Reset Form (Staff Only)</button>
+          <p className="text-slate-600">Thank you, {formData.firstName}. Your information has been saved.</p>
+          <p className="text-lg font-bold text-slate-800 mt-8">Please return the iPad to the front desk.</p>
+          <button onClick={() => window.location.reload()} className="mt-12 text-xs text-slate-300 hover:text-slate-500">
+            Reset Form (Staff Only)
+          </button>
         </div>
       </div>
     );
@@ -125,6 +154,21 @@ export default function IntakeForm() {
               type="date" className="w-full p-2 border rounded-md text-slate-900" 
               value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700">Ethnic Background</label>
+            <p className="text-xs text-slate-400 mb-1">Helps us determine your Fitzpatrick skin type for safe laser settings.</p>
+            <select 
+              className="w-full p-2 border rounded-md text-slate-900 bg-white"
+              value={formData.ethnicBackground}
+              onChange={e => setFormData({...formData, ethnicBackground: e.target.value})}
+            >
+              <option value="">Select...</option>
+              {ethnicOptions.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -188,21 +232,11 @@ export default function IntakeForm() {
           <p className="text-sm text-slate-500">Please answer honestly for your safety.</p>
 
           <div className="space-y-3">
-            {[
-              { key: 'accutane', label: 'Have you taken Accutane in the last 6 months?' },
-              { key: 'sunExposure', label: 'Have you had active sun exposure/tanning in the last 4 weeks?' },
-              { key: 'pregnant', label: 'Are you currently pregnant or breastfeeding?' },
-              { key: 'herpesSimplex', label: 'Do you have a history of cold sores (Herpes Simplex)?' },
-              { key: 'keloids', label: 'Do you have a history of keloid scarring?' },
-              { key: 'tattoos', label: 'Do you have tattoos or permanent makeup in the treatment area?' },
-              { key: 'photosensitive', label: 'Are you taking any photosensitive meds, retinol, or retin-a?' }
-            ].map(item => (
+            {medicalQuestions.map(item => (
               <label key={item.key} className="flex items-start gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
                 <input 
                   type="checkbox" className="mt-1 w-5 h-5 text-blue-600 rounded"
-                  // @ts-ignore
-                  checked={formData.medical[item.key]}
-                  // @ts-ignore
+                  checked={(formData.medical as Record<string, boolean | string>)[item.key] as boolean}
                   onChange={e => setFormData({...formData, medical: {...formData.medical, [item.key]: e.target.checked}})}
                 />
                 <span className="text-sm text-slate-700">{item.label}</span>
