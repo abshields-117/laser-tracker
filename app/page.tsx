@@ -15,7 +15,7 @@ type UserRole = 'admin' | 'md' | 'tech' | null;
 export default function Home() {
   const router = useRouter();
   const [view, setView] = useState<'home' | 'search' | 'logger' | 'md' | 'patient' | 'intake'>('home');
-  const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [userName, setUserName] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -200,7 +200,7 @@ export default function Home() {
           >
             Switch Patient
           </button>
-          <SessionLogger />
+          <SessionLogger patientId={selectedPatientId} />
         </div>
       )}
 
