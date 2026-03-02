@@ -47,6 +47,26 @@ interface PreChecklist {
   consentSigned: boolean;
 }
 
+// ─── Shared Sub-Components (outside main component to avoid remount) ─────────
+
+const Label = ({ children }: { children: React.ReactNode }) => (
+  <label className="text-sm font-semibold text-slate-700">{children}</label>
+);
+
+const NumberInput = ({ value, onChange, placeholder, className = '' }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; className?: string;
+}) => (
+  <input
+    type="number"
+    step="any"
+    value={value}
+    onChange={e => onChange(e.target.value)}
+    placeholder={placeholder}
+    className={`w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 font-mono text-sm
+      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${className}`}
+  />
+);
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function SessionLogger({ patientId }: { patientId: string | null }) {
@@ -253,22 +273,7 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
     </div>
   );
 
-  const Label = ({ children }: { children: React.ReactNode }) => (
-    <label className="text-sm font-semibold text-slate-700">{children}</label>
-  );
-
-  const NumberInput = ({ value, onChange, placeholder, className = '' }: {
-    value: string; onChange: (v: string) => void; placeholder?: string; className?: string;
-  }) => (
-    <input
-      type="number"
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      className={`w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 font-mono text-sm
-        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${className}`}
-    />
-  );
+  // Label and NumberInput moved outside component to prevent re-mount on render
 
   // ─── Loading / Empty States ─────────────────────────────────────────────
 
