@@ -58,7 +58,7 @@ export default function MedicalDirectorDashboard() {
                 </div>
                 
                 <div className="flex flex-col gap-2">
-                  <button className="px-4 py-2 text-sm text-blue-600 font-medium hover:bg-blue-50 rounded">
+                  <button onClick={() => window.location.href = `/patients/${item.id}`} className="px-4 py-2 text-sm text-blue-600 font-medium hover:bg-blue-50 rounded">
                     View Full Chart
                   </button>
                   <button 
