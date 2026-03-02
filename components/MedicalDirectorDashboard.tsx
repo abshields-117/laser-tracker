@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { User, CheckCircle, Clock, FileText, Loader2, AlertTriangle, ChevronDown, ChevronUp, Shield } from 'lucide-react';
+import { User, CheckCircle, Clock, FileText, Loader2, AlertTriangle, ChevronDown, ChevronUp, Shield, Shuffle, Eye } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const MEDICAL_LABELS: Record<string, string> = {
@@ -22,8 +22,11 @@ const MEDICAL_LABELS: Record<string, string> = {
 export default function MedicalDirectorDashboard() {
   const router = useRouter();
   const [queue, setQueue] = useState<any[]>([]);
+  const [auditQueue, setAuditQueue] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'pending' | 'audit'>('pending');
 
   useEffect(() => {
     fetchPendingIntakes();
@@ -60,6 +63,50 @@ export default function MedicalDirectorDashboard() {
       console.error('Error approving patient:', err);
       alert('Failed to approve patient.');
     }
+  };
+
+  const generateRandomAudit = async () => {
+    try {
+      setAuditLoading(true);
+      // Fetch all cleared patients with at least one treatment
+      const { data: allPatients, error } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('medical_clearance_status', true);
+
+      if (error) throw error;
+      if (!allPatients || allPatients.length === 0) {
+        setAuditQueue([]);
+        setAuditLoading(false);
+        return;
+      }
+
+      // Select ~10% randomly (minimum 1)
+      const auditCount = Math.max(1, Math.ceil(allPatients.length * 0.10));
+      const shuffled = [...allPatients].sort(() => Math.random() - 0.5);
+      const selected = shuffled.slice(0, auditCount);
+
+      // Fetch latest treatment for each selected patient
+      const enriched = await Promise.all(selected.map(async (patient) => {
+        const { data: treatments } = await supabase
+          .from('treatments')
+          .select('*')
+          .eq('patient_id', patient.id)
+          .order('session_number', { ascending: false })
+          .limit(1);
+        return { ...patient, latestTreatment: treatments?.[0] || null };
+      }));
+
+      setAuditQueue(enriched);
+    } catch (err) {
+      console.error('Error generating audit:', err);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  const handleAuditSignOff = (id: string) => {
+    setAuditQueue(auditQueue.filter(p => p.id !== id));
   };
 
   const toggleExpand = (id: string) => {
@@ -110,6 +157,26 @@ export default function MedicalDirectorDashboard() {
         <p className="text-slate-400 mt-1">Review intake forms and sign off on new patients</p>
       </div>
 
+      {/* Tab Switcher */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab('pending')}
+          className={`flex-1 py-3 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all ${activeTab === 'pending' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+        >
+          <Clock className="w-4 h-4" />
+          Pending Intakes ({queue.length})
+        </button>
+        <button
+          onClick={() => { setActiveTab('audit'); if (auditQueue.length === 0) generateRandomAudit(); }}
+          className={`flex-1 py-3 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all ${activeTab === 'audit' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+        >
+          <Shuffle className="w-4 h-4" />
+          Random Chart Audit
+        </button>
+      </div>
+
+      {/* ===== PENDING INTAKES TAB ===== */}
+      {activeTab === 'pending' && (
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-slate-50 border-b border-slate-200 p-4">
           <h2 className="font-semibold text-slate-800 flex items-center gap-2">
@@ -254,6 +321,107 @@ export default function MedicalDirectorDashboard() {
           </div>
         )}
       </div>
+      )}
+
+      {/* ===== RANDOM CHART AUDIT TAB ===== */}
+      {activeTab === 'audit' && (
+      <div className="space-y-4">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-purple-50 border-b border-purple-100 p-4 flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-purple-900 flex items-center gap-2">
+                <Shuffle className="w-4 h-4 text-purple-500" />
+                Random Chart Audit (10% Sample)
+              </h2>
+              <p className="text-xs text-purple-600 mt-1">Randomly selected approved patients for chart review and sign-off.</p>
+            </div>
+            <button
+              onClick={generateRandomAudit}
+              disabled={auditLoading}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg flex items-center gap-2 disabled:opacity-50"
+            >
+              {auditLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shuffle className="w-4 h-4" />}
+              New Sample
+            </button>
+          </div>
+
+          {auditLoading ? (
+            <div className="p-12 flex justify-center">
+              <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+            </div>
+          ) : auditQueue.length === 0 ? (
+            <div className="p-12 text-center text-slate-500">
+              <Eye className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-lg font-medium">No approved patients to audit yet.</p>
+              <p className="text-sm">Patients will appear here once they have been approved and treated.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {auditQueue.map((item) => (
+                <div key={item.id} className="p-6 hover:bg-slate-50/50 transition-colors">
+                  <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold">
+                          {item.first_name?.[0]}{item.last_name?.[0]}
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-slate-900">
+                            {item.first_name} {item.last_name}
+                          </h3>
+                          <p className="text-sm text-slate-500">
+                            DOB: {item.dob ? new Date(item.dob + 'T00:00:00').toLocaleDateString() : 'N/A'}
+                            {item.phone && <> • {item.phone}</>}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Quick Info */}
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {item.baseline_skin_type && (
+                          <span className="bg-slate-100 text-slate-700 text-xs font-semibold px-2 py-1 rounded-full">
+                            Type {item.baseline_skin_type}
+                          </span>
+                        )}
+                        {item.latestTreatment ? (
+                          <span className="bg-blue-50 text-blue-700 text-xs font-semibold px-2 py-1 rounded-full">
+                            Last Tx: Session #{item.latestTreatment.session_number} — {new Date(item.latestTreatment.treatment_date).toLocaleDateString()}
+                          </span>
+                        ) : (
+                          <span className="bg-slate-100 text-slate-500 text-xs font-semibold px-2 py-1 rounded-full">
+                            No treatments yet
+                          </span>
+                        )}
+                        {item.latestTreatment?.fluence_jcm2 && (
+                          <span className="bg-slate-100 text-slate-600 text-xs font-mono px-2 py-1 rounded-full">
+                            {item.latestTreatment.fluence_jcm2} J/cm²
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2 flex-shrink-0">
+                      <button 
+                        onClick={() => router.push(`/patients/${item.id}`)}
+                        className="px-4 py-2 text-sm text-blue-600 font-medium hover:bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-2 justify-center"
+                      >
+                        <Eye className="w-4 h-4" /> Review Full Chart
+                      </button>
+                      <button 
+                        onClick={() => handleAuditSignOff(item.id)}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-sm flex items-center gap-2 justify-center"
+                      >
+                        <CheckCircle className="w-4 h-4" /> Chart Reviewed ✓
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      )}
     </div>
   );
 }
