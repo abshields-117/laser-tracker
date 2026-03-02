@@ -20,7 +20,7 @@ export default function MedicalDirectorDashboard() {
       const { data, error } = await supabase
         .from('patients')
         .select('*')
-        .eq('status', 'pending_md_review')
+        .eq('medical_clearance_status', false)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -36,7 +36,7 @@ export default function MedicalDirectorDashboard() {
     try {
       const { error } = await supabase
         .from('patients')
-        .update({ status: 'approved' })
+        .update({ medical_clearance_status: true })
         .eq('id', id);
 
       if (error) throw error;

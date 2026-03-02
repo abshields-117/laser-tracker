@@ -62,7 +62,7 @@ export default function IntakeForm() {
       if (error) throw error;
       setSubmitted(true);
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to submit intake form');
+      setSubmitError(err instanceof Error ? err.message : JSON.stringify(err));
     } finally {
       setSubmitting(false);
     }

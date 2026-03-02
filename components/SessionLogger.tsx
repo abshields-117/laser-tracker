@@ -43,7 +43,6 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
         const { data: planData } = await supabase.from('treatment_plans').select('*').eq('patient_id', patientId).eq('status', 'active').single();
         if (planData) {
           setPlan(planData);
-          setSessionNum(planData.sessions_completed + 1);
           setSelectedPackage(planData.package_type);
         } else {
           setPlan(null);
@@ -74,10 +73,8 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
         const pType = selectedPackage === 'Other (Please specify)' ? otherPackage : selectedPackage;
         const { data: newPlan, error: planErr } = await supabase.from('treatment_plans').insert({
           patient_id: patientId,
-          package_type: pType,
+          package_name: pType,
           total_sessions: 8,
-          sessions_completed: 0,
-          start_date: new Date().toISOString().split('T')[0],
           assigned_tech_id: user?.id,
           status: 'active'
         }).select().single();
@@ -91,22 +88,20 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
         : treatedAreas.join(', ');
 
       const { error: tErr } = await supabase.from('treatments').insert({
-        treatment_plan_id: currentPlanId,
-        performed_by: user?.id,
+        plan_id: currentPlanId,
+        patient_id: patientId,
+        tech_user_id: user?.id,
         session_number: sessionNum,
         treatment_date: new Date().toISOString().split('T')[0],
-        body_area: areaList,
-        fluence: fluence ? parseFloat(fluence) : null,
-        spot_size: spotSize ? parseFloat(spotSize) : null,
+        areas_treated: treatedAreas.includes('Other') ? treatedAreas.filter(a => a !== 'Other').concat(otherTreatedArea) : treatedAreas,
+        fluence_jcm2: fluence ? parseFloat(fluence) : null,
+        skin_type_at_session: skinCheck.type,
+        sun_exposure_check: skinCheck.sunExposure,
+        spot_size: spotSize || null,
         notes: `Sun Exposure: ${skinCheck.sunExposure ? 'Yes' : 'No'}. ${notes}`
       });
       if (tErr) throw tErr;
 
-      // Update Plan Sessions
-      const { error: updErr } = await supabase.from('treatment_plans').update({
-        sessions_completed: sessionNum
-      }).eq('id', currentPlanId);
-      if (updErr) throw updErr;
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
