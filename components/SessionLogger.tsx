@@ -293,8 +293,8 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
   }
 
   const totalSessions = plan?.total_sessions ?? 8;
-  const dob = patient.date_of_birth
-    ? new Date(patient.date_of_birth).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const dob = patient.dob
+    ? new Date(patient.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '—';
 
   // ─── Main Render ────────────────────────────────────────────────────────
@@ -303,7 +303,7 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
     <div className="max-w-3xl mx-auto space-y-5 pb-12">
 
       {/* ── Section 1: Patient Header ─────────────────────────────────── */}
-      <div className="bg-slate-800 rounded-xl p-5 text-white shadow-lg">
+      <div className="bg-slate-900 rounded-xl p-5 text-white shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-bold tracking-tight">
@@ -311,21 +311,29 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
             </h2>
             <p className="text-slate-300 text-sm mt-0.5">DOB: {dob}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {plan?.package_name && (
+              <span className="inline-flex items-center bg-purple-500/20 text-purple-300 text-xs font-bold px-3 py-1.5 rounded-full border border-purple-500/30">
+                {plan.package_name}
+              </span>
+            )}
             <span className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-full border border-amber-500/30">
               <Shield className="w-3.5 h-3.5" />
-              Skin Type {patient.skin_type ?? '—'}
+              Skin Type {patient.baseline_skin_type ?? patient.skin_type ?? '—'}
             </span>
-            <span className="inline-flex items-center bg-blue-500/20 text-blue-300 text-xs font-bold px-3 py-1.5 rounded-full border border-blue-500/30">
-              Session {sessionNum} / {totalSessions}
+            <span className="inline-flex items-center bg-blue-500/20 text-blue-300 text-xs font-bold px-2 py-1 rounded-full border border-blue-500/30">
+              <span className="px-1">Session</span>
+              <input 
+                type="number" 
+                min="1"
+                value={sessionNum || ''} 
+                onChange={(e) => setSessionNum(parseInt(e.target.value) || 1)}
+                className="w-10 bg-blue-900/60 text-white text-center rounded font-mono border border-blue-400/30 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 py-0.5 mx-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <span className="px-1">/ {totalSessions}</span>
             </span>
           </div>
         </div>
-        {plan && (
-          <p className="text-slate-400 text-xs mt-2">
-            Plan: {plan.package_name} &middot; Tech: {plan.assigned_tech_id ? 'Assigned' : 'Unassigned'}
-          </p>
-        )}
       </div>
 
       {/* ── Section 2: Pre-Treatment Checklist ────────────────────────── */}
