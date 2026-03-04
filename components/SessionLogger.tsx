@@ -82,6 +82,7 @@ const NumberInput = ({ value, onChange, placeholder, className = '' }: {
 export default function SessionLogger({ patientId }: { patientId: string | null }) {
   const [patient, setPatient] = useState<any>(null);
   const [plan, setPlan] = useState<any>(null);
+  const [packageName, setPackageName] = useState<string>('Standard Package');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -147,6 +148,10 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
         .eq('status', 'active');
       const activePlan = plans?.[0] ?? null;
       setPlan(activePlan);
+      
+      if (activePlan?.package_name) {
+        setPackageName(activePlan.package_name);
+      }
 
       // Fetch most recent treatment for pre-population
       if (activePlan) {
@@ -216,7 +221,7 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
           .from('treatment_plans')
           .insert({
             patient_id: patientId,
-            package_name: patient.package_name ?? 'Standard Package',
+            package_name: packageName || 'Standard Package',
             total_sessions: 8,
             status: 'active',
             assigned_tech_id: user?.id,
@@ -226,6 +231,13 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
         if (planErr) throw planErr;
         activePlan = newPlan;
         setPlan(newPlan);
+      } else if (activePlan.package_name !== packageName) {
+        // Update plan name if changed
+        const { error: planUpdateErr } = await supabase
+          .from('treatment_plans')
+          .update({ package_name: packageName || 'Standard Package' })
+          .eq('id', activePlan.id);
+        if (planUpdateErr) throw planUpdateErr;
       }
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -312,11 +324,16 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
             <p className="text-slate-300 text-sm mt-0.5">DOB: {dob}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {plan?.package_name && (
-              <span className="inline-flex items-center bg-purple-500/20 text-purple-300 text-xs font-bold px-3 py-1.5 rounded-full border border-purple-500/30">
-                {plan.package_name}
-              </span>
-            )}
+            <span className="inline-flex items-center bg-purple-500/20 text-purple-300 text-xs font-bold px-2 py-1 rounded-full border border-purple-500/30">
+              <input 
+                type="text" 
+                value={packageName} 
+                onChange={(e) => setPackageName(e.target.value)}
+                placeholder="Package Name"
+                className="bg-purple-900/60 text-white text-center rounded font-semibold border border-purple-400/30 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 py-0.5 mx-1"
+                style={{ width: `${Math.max(12, packageName.length + 2)}ch` }}
+              />
+            </span>
             <span className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-full border border-amber-500/30">
               <Shield className="w-3.5 h-3.5" />
               Skin Type {patient.baseline_skin_type ?? patient.skin_type ?? '—'}
