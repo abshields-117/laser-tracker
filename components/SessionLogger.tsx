@@ -102,6 +102,8 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
   const [sunExposure, setSunExposure] = useState(false);
   const [sunExposedAreas, setSunExposedAreas] = useState<string[]>([]);
 
+  const [skinTypeAtSession, setSkinTypeAtSession] = useState<string>('');
+
   // Treatment parameters
   const [params, setParams] = useState<TreatmentParams>({
     wavelength: '755nm (Alexandrite)',
@@ -139,6 +141,7 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
         .eq('id', patientId)
         .single();
       setPatient(pt);
+      setSkinTypeAtSession(pt?.baseline_skin_type || pt?.skin_type || '');
 
       // Fetch active plan
       const { data: plans } = await supabase
@@ -208,6 +211,10 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
 
   const handleSave = async () => {
     if (!patientId || !patient) return;
+    if (!skinTypeAtSession) {
+      setError("Please select the patient's Skin Type Today.");
+      return;
+    }
     setSaving(true);
     setError(null);
 
@@ -250,7 +257,7 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
         plan_id: activePlan.id,
         tech_user_id: user?.id,
         session_number: sessionNum,
-        skin_type_at_session: patient.skin_type ?? null,
+        skin_type_at_session: skinTypeAtSession || null,
         sun_exposure_check: sunExposure,
         sun_exposed_areas: sunExposure ? sunExposedAreas : null,
         areas_treated: {
@@ -336,7 +343,7 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
             </span>
             <span className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-full border border-amber-500/30">
               <Shield className="w-3.5 h-3.5" />
-              Skin Type {patient.baseline_skin_type ?? patient.skin_type ?? '—'}
+              Skin Type {patient.baseline_skin_type ?? '—'}
             </span>
             <span className="inline-flex items-center bg-blue-500/20 text-blue-300 text-xs font-bold px-2 py-1 rounded-full border border-blue-500/30">
               <span className="px-1">Session</span>
@@ -371,6 +378,20 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
               <span className="text-sm text-slate-700">{label}</span>
             </label>
           ))}
+
+          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3">
+            <Label>Skin Type Today (Fitzpatrick):</Label>
+            <select
+              value={skinTypeAtSession}
+              onChange={e => setSkinTypeAtSession(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 bg-white"
+            >
+              <option value="" disabled>Select Type</option>
+              {SKIN_TYPES.map(type => (
+                <option key={type} value={type}>Type {type}</option>
+              ))}
+            </select>
+          </div>
 
           <div className="border-t border-slate-100 pt-3 mt-3">
             <label className="flex items-center gap-3 cursor-pointer">
