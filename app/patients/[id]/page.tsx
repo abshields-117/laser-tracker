@@ -51,9 +51,9 @@ export default function PatientChartPage() {
             .from('treatments')
             .select(`
               *,
-              users:performed_by (full_name)
+              profiles!tech_user_id(full_name)
             `)
-            .in('treatment_plan_id', planIds)
+            .in('plan_id', planIds)
             .order('session_number', { ascending: false });
             
           if (tError) throw tError;
@@ -217,7 +217,7 @@ export default function PatientChartPage() {
                           </div>
                           <div className="text-right">
                             <span className="block text-xs font-semibold text-slate-400 uppercase">Provider</span>
-                            <span className="block text-sm font-medium text-slate-800">{t.users?.full_name || 'Tech'}</span>
+                            <span className="block text-sm font-medium text-slate-800">{t.profiles?.full_name || 'Tech'}</span>
                           </div>
                         </div>
                         
