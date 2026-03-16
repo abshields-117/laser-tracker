@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { User, CheckCircle, Clock, FileText, Loader2, AlertTriangle, ChevronDown, ChevronUp, Shield, Shuffle, Eye } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import PatientSearch from './PatientSearch';
+import { Users } from 'lucide-react';
 
 const MEDICAL_LABELS: Record<string, string> = {
   selfTanner: 'Self tanner in last 7 days',
@@ -26,7 +28,7 @@ export default function MedicalDirectorDashboard() {
   const [loading, setLoading] = useState(true);
   const [auditLoading, setAuditLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'pending' | 'audit'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'audit' | 'all'>('pending');
 
   useEffect(() => {
     fetchPendingIntakes();
@@ -161,17 +163,24 @@ export default function MedicalDirectorDashboard() {
       <div className="flex gap-2">
         <button
           onClick={() => setActiveTab('pending')}
-          className={`flex-1 py-3 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all ${activeTab === 'pending' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+          className={`flex-1 py-3 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all whitespace-nowrap ${activeTab === 'pending' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
         >
           <Clock className="w-4 h-4" />
           Pending Intakes ({queue.length})
         </button>
         <button
           onClick={() => { setActiveTab('audit'); if (auditQueue.length === 0) generateRandomAudit(); }}
-          className={`flex-1 py-3 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all ${activeTab === 'audit' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+          className={`flex-1 py-3 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all whitespace-nowrap ${activeTab === 'audit' ? 'bg-purple-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
         >
           <Shuffle className="w-4 h-4" />
           Random Chart Audit
+        </button>
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`flex-1 py-3 px-4 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all whitespace-nowrap ${activeTab === 'all' ? 'bg-teal-600 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}
+        >
+          <Users className="w-4 h-4" />
+          All Patients
         </button>
       </div>
 
@@ -321,6 +330,13 @@ export default function MedicalDirectorDashboard() {
           </div>
         )}
       </div>
+      )}
+
+      {/* ===== ALL PATIENTS TAB ===== */}
+      {activeTab === 'all' && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 md:p-6 overflow-hidden">
+          <PatientSearch onSelectPatient={(id) => router.push(`/patients/${id}`)} />
+        </div>
       )}
 
       {/* ===== RANDOM CHART AUDIT TAB ===== */}

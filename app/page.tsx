@@ -200,7 +200,7 @@ export default function Home() {
           >
             Switch Patient
           </button>
-          <SessionLogger patientId={selectedPatientId} />
+          <SessionLogger patientId={selectedPatientId} onSaveSuccess={() => setView('search')} />
         </div>
       )}
 

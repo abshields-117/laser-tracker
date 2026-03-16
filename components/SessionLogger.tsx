@@ -79,7 +79,7 @@ const NumberInput = ({ value, onChange, placeholder, className = '' }: {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function SessionLogger({ patientId }: { patientId: string | null }) {
+export default function SessionLogger({ patientId, onSaveSuccess }: { patientId: string | null, onSaveSuccess?: () => void }) {
   const [patient, setPatient] = useState<any>(null);
   const [plan, setPlan] = useState<any>(null);
   const [packageName, setPackageName] = useState<string>('Standard Package');
@@ -282,7 +282,10 @@ export default function SessionLogger({ patientId }: { patientId: string | null 
 
       if (insertErr) throw insertErr;
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 4000);
+      setTimeout(() => {
+        setSuccess(false);
+        if (onSaveSuccess) onSaveSuccess();
+      }, 2000);
     } catch (e: any) {
       setError(e.message);
     } finally {
