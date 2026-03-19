@@ -144,6 +144,8 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
   // Notes
   const [notes, setNotes] = useState('');
   const [techNotes, setTechNotes] = useState('');
+  const [notesHistory, setNotesHistory] = useState<Array<{session_number: number; treatment_date: string; notes: string | null; tech_notes: string | null}>>([]);
+  const [showNotesHistory, setShowNotesHistory] = useState(false);
 
   // ─── Data Fetching ──────────────────────────────────────────────────────
 
@@ -187,6 +189,14 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
         if (prev) {
           setSessionNum(prev.session_number + 1);
           setTechNotes(prev.tech_notes || '');
+
+        // Fetch notes history
+        const { data: historyData } = await supabase
+          .from('treatments')
+          .select('session_number, treatment_date, notes, tech_notes')
+          .eq('plan_id', activePlan.id)
+          .order('session_number', { ascending: false });
+        if (historyData) setNotesHistory(historyData.filter(h => h.notes || h.tech_notes));
           // Pre-populate parameters from previous session
           const prevAreas = prev.areas_treated as any;
           setParams(p => ({
@@ -656,6 +666,43 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
             />
           </div>
         </div>
+          <div className="pt-3 border-t border-slate-100">
+            <button 
+              onClick={() => setShowNotesHistory(!showNotesHistory)}
+              className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              <ChevronDown className={`w-4 h-4 transition-transform ${showNotesHistory ? 'rotate-180' : ''}`} />
+              {showNotesHistory ? 'Hide' : 'View'} Notes History ({notesHistory.length} sessions)
+            </button>
+            {showNotesHistory && (
+              <div className="mt-3 space-y-3 max-h-64 overflow-y-auto">
+                {notesHistory.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">No previous notes found.</p>
+                ) : (
+                  notesHistory.map((h, i) => (
+                    <div key={i} className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-slate-500">Session {h.session_number}</span>
+                        <span className="text-xs text-slate-400">{new Date(h.treatment_date).toLocaleDateString()}</span>
+                      </div>
+                      {h.notes && (
+                        <div className="mb-2">
+                          <span className="text-xs font-semibold text-amber-700 uppercase">Clinical</span>
+                          <p className="text-sm text-slate-700 mt-0.5">{h.notes}</p>
+                        </div>
+                      )}
+                      {h.tech_notes && (
+                        <div>
+                          <span className="text-xs font-semibold text-purple-700 uppercase">Internal</span>
+                          <p className="text-sm text-slate-700 mt-0.5">{h.tech_notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
       </SectionCard>
 
       {/* ── Section 7: Save ───────────────────────────────────────────── */}
