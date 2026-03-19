@@ -4,10 +4,25 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import {
   Save, User, Zap, Sun, Loader2, CheckCircle2, ClipboardCheck,
-  Activity, MessageSquare, ChevronDown, Shield, Square, Circle,
+  Activity, MessageSquare, ChevronDown, Shield, Square, Circle, FileText, X, AlertTriangle,
 } from 'lucide-react';
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Constants
+
+const MEDICAL_LABELS: Record<string, string> = {
+  selfTanner: 'Self tanner in last 7 days',
+  sunExposure: 'Prolonged sun exposure (last 4 weeks)',
+  accutane: 'Accutane in last 6 months',
+  pregnant: 'Currently pregnant or breastfeeding',
+  recentBirth: 'Given birth in last 12 months',
+  photosensitive: 'Photosensitive meds / retinol / retin-a',
+  antibiotics: 'Currently taking antibiotics',
+  herpesSimplex: 'History of Herpes Simplex',
+  keloids: 'History of keloid scarring',
+  tattoos: 'Tattoos/permanent makeup in treatment area',
+  cancer: 'History of skin cancer',
+};
+// ───────────────────────────────────────────────────────────────
 
 const BODY_AREAS = [
   'Underarms', 'Bikini/Brazilian', 'Full Legs', 'Back',
@@ -26,7 +41,7 @@ const WAVELENGTH_OPTIONS = ['755nm (Alexandrite)', '1064nm (Nd:YAG)', 'Blend'] a
 
 const COOLING_LEVELS = ['Off', 'Low', 'Medium', 'High', 'Max'] as const;
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types// ───────────────────────────────────────────────────────────────────
 
 interface TreatmentParams {
   wavelength: string;
@@ -77,7 +92,7 @@ const NumberInput = ({ value, onChange, placeholder, className = '' }: {
   />
 );
 
-// ─── Component ───────────────────────────────────────────────────────────────
+// ─── Component// ───────────────────────────────────────────────────────────────
 
 export default function SessionLogger({ patientId, onSaveSuccess }: { patientId: string | null, onSaveSuccess?: () => void }) {
   const [patient, setPatient] = useState<any>(null);
@@ -87,6 +102,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showIntakeModal, setShowIntakeModal] = useState(false);
 
   // Session
   const [sessionNum, setSessionNum] = useState(1);
@@ -344,10 +360,13 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
                 style={{ width: `${Math.max(12, packageName.length + 2)}ch` }}
               />
             </span>
-            <span className="inline-flex items-center gap-1.5 bg-amber-500/20 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-full border border-amber-500/30">
-              <Shield className="w-3.5 h-3.5" />
-              Skin Type {patient.baseline_skin_type ?? '—'}
-            </span>
+            <button 
+              onClick={() => setShowIntakeModal(true)}
+              className="inline-flex items-center gap-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-full border border-indigo-500/30 transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              View Intake
+            </button>
             <span className="inline-flex items-center bg-blue-500/20 text-blue-300 text-xs font-bold px-2 py-1 rounded-full border border-blue-500/30">
               <span className="px-1">Session</span>
               <input 
@@ -632,6 +651,102 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           <><Save className="w-4 h-4" /> Save Treatment Session</>
         )}
       </button>
+
+      {/* ── Intake Modal ───────────────────────────────────────────── */}
+      {showIntakeModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-500" />
+                Patient Intake Form
+              </h3>
+              <button onClick={() => setShowIntakeModal(false)} className="text-slate-400 hover:text-slate-600 bg-white rounded-full p-1 border border-slate-200">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto flex-1 space-y-6">
+              
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Demographics</h4>
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <div>
+                    <span className="block text-slate-500">Name</span>
+                    <span className="font-medium text-slate-900">{patient.first_name} {patient.last_name}</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-500">DOB</span>
+                    <span className="font-medium text-slate-900">{dob}</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-500">Phone</span>
+                    <span className="font-medium text-slate-900">{patient.phone || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-500">Email</span>
+                    <span className="font-medium text-slate-900">{patient.email || '—'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Medical History</h4>
+                {(() => {
+                  const history = patient.medical_history_json;
+                  if (!history || typeof history !== 'object') {
+                    return <p className="text-sm text-slate-500 italic">No medical history recorded.</p>;
+                  }
+                  
+                  const flagged = Object.entries(history).filter(([key, val]) => val === true && key !== 'medications');
+                  const medications = history.medications;
+
+                  return (
+                    <div className="space-y-3">
+                      {flagged.length > 0 ? (
+                        <div className="space-y-2">
+                          {flagged.map(([key]) => (
+                            <div key={key} className="flex items-start gap-2.5 text-sm bg-red-50 text-red-800 px-3 py-2 rounded-lg border border-red-100">
+                              <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                              <span className="font-medium">{MEDICAL_LABELS[key] || key}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg border border-green-100">
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          <span className="font-medium">No medical contraindications flagged</span>
+                        </div>
+                      )}
+                      
+                      {medications && medications.trim() !== '' && (
+                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mt-3">
+                          <span className="block text-xs font-semibold text-blue-800 uppercase mb-1">Current Medications</span>
+                          <p className="text-sm text-blue-900">{medications}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Skin Profile</h4>
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <div>
+                    <span className="block text-slate-500">Fitzpatrick Type</span>
+                    <span className="font-medium text-slate-900">{patient.baseline_skin_type || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-500">Ethnic Background</span>
+                    <span className="font-medium text-slate-900">{patient.ethnic_background || '—'}</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
