@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { AlertTriangle, CheckCircle, FileText, ChevronRight, Loader2 } from 'lucide-react';
+import CherryFinancing from '@/components/CherryFinancing';
 
 export default function IntakeForm() {
   const [step, setStep] = useState(1);
@@ -107,10 +108,13 @@ export default function IntakeForm() {
   if (submitted) {
     return (
       <div className="max-w-xl mx-auto p-6 bg-slate-50 min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
+        <div className="w-full text-center space-y-4">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
           <h2 className="text-2xl font-bold text-slate-900">Intake Submitted!</h2>
           <p className="text-slate-600">Thank you, {formData.firstName}. Your information has been saved.</p>
+          
+          <CherryFinancing />
+
           <p className="text-lg font-bold text-slate-800 mt-8">Please return the iPad to the front desk.</p>
           <button onClick={() => window.location.reload()} className="mt-12 text-xs text-slate-300 hover:text-slate-500">
             Reset Form (Staff Only)
