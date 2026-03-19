@@ -47,8 +47,7 @@ interface TreatmentParams {
   wavelength: string;
   spotShape: 'Square' | 'Round';
   spotSize: string;
-  fluenceAlex: string;
-  fluenceYag: string;
+  fluenceTotal: string;
   pulseWidthAlex: string;
   pulseWidthYag: string;
   repRate: string;
@@ -106,6 +105,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
 
   // Session
   const [sessionNum, setSessionNum] = useState(1);
+  const [totalSessionsEdit, setTotalSessionsEdit] = useState(8);
 
   // Pre-treatment checklist
   const [preChecklist, setPreChecklist] = useState<PreChecklist>({
@@ -125,8 +125,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
     wavelength: '755nm (Alexandrite)',
     spotShape: 'Square',
     spotSize: '',
-    fluenceAlex: '',
-    fluenceYag: '',
+    fluenceTotal: '',
     pulseWidthAlex: '',
     pulseWidthYag: '',
     repRate: '',
@@ -137,12 +136,14 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
   // Areas treated
   const [areasTreated, setAreasTreated] = useState<string[]>([]);
   const [otherArea, setOtherArea] = useState('');
+  const [showOtherArea, setShowOtherArea] = useState(false);
 
   // Clinical endpoint
   const [clinicalEndpoint, setClinicalEndpoint] = useState('');
 
   // Notes
   const [notes, setNotes] = useState('');
+  const [techNotes, setTechNotes] = useState('');
 
   // ─── Data Fetching ──────────────────────────────────────────────────────
 
@@ -167,6 +168,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
         .eq('status', 'active');
       const activePlan = plans?.[0] ?? null;
       setPlan(activePlan);
+      if (activePlan) setTotalSessionsEdit(activePlan.total_sessions || 8);
       
       if (activePlan?.package_name) {
         setPackageName(activePlan.package_name);
@@ -184,13 +186,13 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
         const prev = treatments?.[0];
         if (prev) {
           setSessionNum(prev.session_number + 1);
+          setTechNotes(prev.tech_notes || '');
           // Pre-populate parameters from previous session
           const prevAreas = prev.areas_treated as any;
           setParams(p => ({
             ...p,
             spotSize: prev.spot_size ?? '',
-            fluenceAlex: prev.fluence_jcm2?.toString() ?? '',
-            fluenceYag: prev.shots_fired_yag ? prev.fluence_jcm2?.toString() ?? '' : '',
+            fluenceTotal: prev.fluence_jcm2?.toString() ?? '',
             pulseWidthAlex: prev.pulse_width_ms?.toString() ?? '',
             pulseWidthYag: prev.pulse_width_ms?.toString() ?? '',
             coolingLevel: prev.cooling_setting ?? 'Medium',
@@ -204,6 +206,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           }
         } else {
           setSessionNum(1);
+          setTechNotes('');
         }
       }
     } catch (e: any) {
@@ -227,6 +230,10 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
 
   const handleSave = async () => {
     if (!patientId || !patient) return;
+    if (showOtherArea && !otherArea.trim()) {
+      setError("Please specify the 'Other' area.");
+      return;
+    }
     if (!skinTypeAtSession) {
       setError("Please select the patient's Skin Type Today.");
       return;
@@ -245,7 +252,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           .insert({
             patient_id: patientId,
             package_name: packageName || 'Standard Package',
-            total_sessions: 8,
+            total_sessions: totalSessionsEdit,
             status: 'active',
             assigned_tech_id: user?.id,
           })
@@ -258,7 +265,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
         // Update plan name if changed
         const { error: planUpdateErr } = await supabase
           .from('treatment_plans')
-          .update({ package_name: packageName || 'Standard Package' })
+          .update({ package_name: packageName || 'Standard Package', total_sessions: totalSessionsEdit })
           .eq('id', activePlan.id);
         if (planUpdateErr) throw planUpdateErr;
       }
@@ -266,7 +273,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
       const { data: { user } } = await supabase.auth.getUser();
 
       const allAreas = [...areasTreated];
-      if (otherArea.trim()) allAreas.push(otherArea.trim());
+      if (showOtherArea && otherArea.trim()) allAreas.push(otherArea.trim());
 
       const { error: insertErr } = await supabase.from('treatments').insert({
         patient_id: patientId,
@@ -286,12 +293,14 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           },
         },
         spot_size: params.spotSize || null,
-        fluence_jcm2: params.fluenceAlex ? parseFloat(params.fluenceAlex) : null,
+        fluence_jcm2: params.fluenceTotal ? parseFloat(params.fluenceTotal) : null,
         pulse_width_ms: params.pulseWidthAlex ? parseFloat(params.pulseWidthAlex) : null,
         cooling_setting: params.coolingLevel,
         overlap_percent: null,
-        shots_fired_alex: params.numPulses ? parseInt(params.numPulses) : null,
-        shots_fired_yag: params.fluenceYag ? parseInt(params.numPulses || '0') : null,
+        
+        shots_fired_alex: params.wavelength.includes('Alexandrite') || params.wavelength === 'Blend' ? (params.numPulses ? parseInt(params.numPulses) : null) : null,
+        shots_fired_yag: params.wavelength.includes('Nd:YAG') || params.wavelength === 'Blend' ? (params.numPulses ? parseInt(params.numPulses) : null) : null,
+        tech_notes: techNotes || null,
         clinical_endpoint: clinicalEndpoint || null,
         notes: notes || null,
       });
@@ -376,7 +385,14 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
                 onChange={(e) => setSessionNum(parseInt(e.target.value) || 1)}
                 className="w-10 bg-blue-900/60 text-white text-center rounded font-mono border border-blue-400/30 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 py-0.5 mx-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
-              <span className="px-1">/ {totalSessions}</span>
+              <span className="px-1">/ </span>
+              <input 
+                type="number" 
+                min="1"
+                value={totalSessionsEdit || ''} 
+                onChange={(e) => setTotalSessionsEdit(parseInt(e.target.value) || 1)}
+                className="w-10 bg-blue-900/60 text-white text-center rounded font-mono border border-blue-400/30 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 py-0.5 mr-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
             </span>
           </div>
         </div>
@@ -505,18 +521,11 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
             </div>
           </div>
 
-          {/* Fluence - dual column */}
+          {/* Fluence - Single Column */}
           <div>
-            <Label>Fluence F (J/cm²)</Label>
-            <div className="grid grid-cols-2 gap-4 mt-1.5">
-              <div>
-                <span className="text-xs text-slate-500">755nm Alexandrite</span>
-                <NumberInput value={params.fluenceAlex} onChange={v => updateParam('fluenceAlex', v)} placeholder="J/cm²" />
-              </div>
-              <div>
-                <span className="text-xs text-slate-500">1064nm Nd:YAG</span>
-                <NumberInput value={params.fluenceYag} onChange={v => updateParam('fluenceYag', v)} placeholder="J/cm²" />
-              </div>
+            <Label>Fluence Total (J/cm²)</Label>
+            <div className="mt-1.5">
+                <NumberInput value={params.fluenceTotal} onChange={v => updateParam('fluenceTotal', v)} placeholder="J/cm²" />
             </div>
           </div>
 
@@ -578,16 +587,25 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
             </label>
           ))}
         </div>
-        <div className="mt-3">
-          <Label>Other</Label>
-          <input
-            type="text"
-            value={otherArea}
-            onChange={e => setOtherArea(e.target.value)}
-            placeholder="Specify other area..."
-            className="w-full mt-1 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm
-              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+        <div className="mt-4 pt-3 border-t border-slate-100">
+          <label className="flex items-center gap-2 cursor-pointer mb-2">
+            <input
+              type="checkbox"
+              checked={showOtherArea}
+              onChange={() => setShowOtherArea(!showOtherArea)}
+              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm font-semibold text-slate-700">Other Area</span>
+          </label>
+          {showOtherArea && (
+            <input
+              type="text"
+              value={otherArea}
+              onChange={e => setOtherArea(e.target.value)}
+              placeholder="Specify other area..."
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          )}
         </div>
       </SectionCard>
 
@@ -614,15 +632,30 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
       </SectionCard>
 
       {/* ── Section 6: Comments ───────────────────────────────────────── */}
-      <SectionCard title="Clinical Notes" icon={<MessageSquare className="w-4 h-4 text-slate-500" />}>
-        <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          rows={4}
-          placeholder="Post-treatment observations, patient feedback, parameter adjustments for next session..."
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
-        />
+      <SectionCard title="Notes" icon={<MessageSquare className="w-4 h-4 text-slate-500" />}>
+        <div className="space-y-4">
+          <div>
+            <Label>Clinical Notes</Label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Post-treatment observations, patient feedback..."
+              className="w-full mt-1.5 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+            />
+          </div>
+          <div className="pt-3 border-t border-slate-100">
+            <Label>Internal Session Notes (Tech Only)</Label>
+            <p className="text-xs text-slate-500 mb-1.5">Saves and prepopulates for the next session.</p>
+            <textarea
+              value={techNotes}
+              onChange={e => setTechNotes(e.target.value)}
+              rows={2}
+              placeholder="Internal reminders for the next time this patient comes in..."
+              className="w-full rounded-lg border border-slate-300 bg-amber-50/50 px-3 py-2 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-y"
+            />
+          </div>
+        </div>
       </SectionCard>
 
       {/* ── Section 7: Save ───────────────────────────────────────────── */}

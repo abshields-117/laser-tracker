@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useParams, useRouter } from 'next/navigation';
-import { Loader2, ArrowLeft, User, FileText, Activity, Calendar } from 'lucide-react';
+import { Loader2, ArrowLeft, User, FileText, Activity, Calendar, CheckCircle } from 'lucide-react';
 
 type Patient = any;
 type TreatmentPlan = any;
@@ -173,13 +173,48 @@ export default function PatientChartPage() {
                 <User className="w-5 h-5 text-slate-500" />
                 <h2 className="font-bold text-slate-800">Medical History</h2>
               </div>
-              <div className="p-6">
-                 {/* Quick parse of JSONB if needed, else raw text */}
-                 <p className="text-sm text-slate-600 whitespace-pre-wrap">
-                   {typeof patient.medical_history === 'string' 
-                      ? patient.medical_history 
-                      : JSON.stringify(patient.medical_history, null, 2) || 'No specific history logged.'}
-                 </p>
+              <div className="p-6 space-y-4">
+                 {(() => {
+                   const history = patient.medical_history_json || patient.medical_history;
+                   if (!history || typeof history !== 'object') {
+                     return <p className="text-sm text-slate-500 italic">No medical history recorded.</p>;
+                   }
+                   const flagged = Object.entries(history).filter(([key, val]) => val === true && key !== 'medications');
+                   const medications = (history as any).medications;
+                   return (
+                     <div className="space-y-3">
+                       {flagged.length > 0 ? (
+                         <div className="space-y-2">
+                           {flagged.map(([key]) => (
+                             <div key={key} className="flex items-center gap-2 text-sm text-red-700 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
+                               <span className="font-medium">{key}</span>
+                             </div>
+                           ))}
+                         </div>
+                       ) : (
+                         <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg border border-green-100">
+                           <CheckCircle className="w-4 h-4 text-green-500" />
+                           <span className="font-medium">No medical contraindications flagged</span>
+                         </div>
+                       )}
+                       {medications && String(medications).trim() !== '' && (
+                         <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
+                           <span className="block text-xs font-semibold text-blue-800 uppercase mb-1">Current Medications</span>
+                           <p className="text-sm text-blue-900">{String(medications)}</p>
+                         </div>
+                       )}
+                     </div>
+                   );
+                 })()}
+                 <div className="pt-4 border-t border-slate-100">
+                   <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
+                     <CheckCircle className="w-4 h-4" />
+                     <span>Treatment Consent Signed</span>
+                   </div>
+                   <p className="text-slate-500 text-xs ml-6 mt-1">
+                     Digitally signed on {new Date(patient.created_at).toLocaleString()}
+                   </p>
+                 </div>
               </div>
             </div>
           </div>
@@ -236,6 +271,12 @@ export default function PatientChartPage() {
                           <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
                             <span className="block text-xs font-semibold text-amber-800 uppercase mb-1">Clinical Notes</span>
                             <p className="text-sm text-amber-900">{t.notes}</p>
+                          </div>
+                        )}
+                        {t.tech_notes && (
+                          <div className="bg-purple-50 rounded-lg p-4 border border-purple-100 mt-2">
+                            <span className="block text-xs font-semibold text-purple-800 uppercase mb-1">Internal Session Notes</span>
+                            <p className="text-sm text-purple-900">{t.tech_notes}</p>
                           </div>
                         )}
                       </div>

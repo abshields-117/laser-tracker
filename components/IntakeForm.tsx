@@ -63,6 +63,16 @@ export default function IntakeForm() {
 
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  
+  const formatPhoneNumber = (value: string) => {
+    if (!value) return value;
+    const phoneNumber = value.replace(/[^\d]/g, '');
+    const phoneNumberLength = phoneNumber.length;
+    if (phoneNumberLength < 4) return phoneNumber;
+    if (phoneNumberLength < 7) return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3)}`;
+    return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
+  };
+
   const handleNext = () => {
     setValidationError(null);
     if (step === 1) {
@@ -198,7 +208,7 @@ export default function IntakeForm() {
               <label className="block text-sm font-medium text-slate-700">Phone</label>
               <input 
                 type="tel" className="w-full p-2 border rounded-md text-slate-900" 
-                value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
+                value={formData.phone} onChange={e => setFormData({...formData, phone: formatPhoneNumber(e.target.value)})}
               />
             </div>
           </div>
