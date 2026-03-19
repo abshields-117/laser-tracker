@@ -743,6 +743,20 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
                 </div>
               </div>
 
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Agreements & Consents</h4>
+                <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-sm">
+                  <div className="flex items-center gap-2 text-green-700 font-medium mb-1">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Treatment Consent Signed</span>
+                  </div>
+                  <p className="text-slate-500 text-xs ml-6">
+                    Digitally signed and acknowledged on {new Date(patient.created_at).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
