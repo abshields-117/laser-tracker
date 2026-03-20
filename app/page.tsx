@@ -137,6 +137,7 @@ export default function Home() {
               </div>
             </button>
 
+{/* My Portal (Demo) — hidden for production, preserved for future use
             <button 
               onClick={() => setView('patient')}
               className="w-full p-6 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-all group flex items-center gap-4 text-left"
@@ -149,6 +150,7 @@ export default function Home() {
                 <span className="text-sm text-slate-400">View progress & next appt</span>
               </div>
             </button>
+            */}
           </div>
 
           <div className="flex justify-center">
