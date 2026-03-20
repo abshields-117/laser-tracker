@@ -531,25 +531,26 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
             </div>
           </div>
 
-          {/* Fluence - Single Column */}
-          <div>
-            <Label>Fluence Total (J/cm²)</Label>
-            <div className="mt-1.5">
-                <NumberInput value={params.fluenceTotal} onChange={v => updateParam('fluenceTotal', v)} placeholder="J/cm²" />
-            </div>
-          </div>
-
-          {/* Pulse Duration - dual column */}
-          <div>
-            <Label>Pulse Duration PD (ms)</Label>
-            <div className="grid grid-cols-2 gap-4 mt-1.5">
-              <div>
-                <span className="text-xs text-slate-500">755nm Alexandrite</span>
-                <NumberInput value={params.pulseWidthAlex} onChange={v => updateParam('pulseWidthAlex', v)} placeholder="ms" />
+          {/* Fluence & Pulse Duration Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label>Fluence Total (J/cm²)</Label>
+              <div className="mt-1.5">
+                  <NumberInput value={params.fluenceTotal} onChange={v => updateParam('fluenceTotal', v)} placeholder="J/cm²" />
               </div>
-              <div>
-                <span className="text-xs text-slate-500">1064nm Nd:YAG</span>
-                <NumberInput value={params.pulseWidthYag} onChange={v => updateParam('pulseWidthYag', v)} placeholder="ms" />
+            </div>
+            
+            <div>
+              <Label>Pulse Duration PD (ms)</Label>
+              <div className="grid grid-cols-2 gap-4 mt-1.5">
+                <div>
+                  <span className="text-xs text-slate-500">755nm Alex</span>
+                  <NumberInput value={params.pulseWidthAlex} onChange={v => updateParam('pulseWidthAlex', v)} placeholder="ms" />
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500">1064nm Nd:YAG</span>
+                  <NumberInput value={params.pulseWidthYag} onChange={v => updateParam('pulseWidthYag', v)} placeholder="ms" />
+                </div>
               </div>
             </div>
           </div>
@@ -571,8 +572,8 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
               </div>
             </div>
             <div>
-              <Label>Number of Pulses</Label>
-              <NumberInput value={params.numPulses} onChange={v => updateParam('numPulses', v)} placeholder="Total" />
+              <Label>Shots Fired</Label>
+              <NumberInput value={params.numPulses} onChange={v => updateParam('numPulses', v)} placeholder="Total Shots" />
             </div>
           </div>
         </div>
