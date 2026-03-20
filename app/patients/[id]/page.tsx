@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useParams, useRouter } from 'next/navigation';
-import { Loader2, ArrowLeft, User, FileText, Activity, Calendar, CheckCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, User, FileText, Activity, Calendar, CheckCircle, ChevronDown } from 'lucide-react';
 
 type Patient = any;
 type TreatmentPlan = any;
@@ -18,6 +18,7 @@ export default function PatientChartPage() {
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedTreatment, setExpandedTreatment] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchChart() {
@@ -235,52 +236,115 @@ export default function PatientChartPage() {
                   <div className="p-8 text-center text-slate-500">No treatments recorded yet.</div>
                 ) : (
                   <div className="divide-y divide-slate-100">
-                    {treatments.map((t) => (
-                      <div key={t.id} className="p-6 hover:bg-slate-50 transition-colors">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-blue-100 text-blue-700 font-bold w-10 h-10 rounded-full flex items-center justify-center">
-                              {t.session_number}
+                    {treatments.map((t) => {
+                      const isExpanded = expandedTreatment === t.id;
+                      return (
+                      <div key={t.id} className="hover:bg-slate-50 transition-colors">
+                        {/* Collapsed Summary Row - Always Visible */}
+                        <button 
+                          onClick={() => setExpandedTreatment(isExpanded ? null : t.id)}
+                          className="w-full p-4 flex items-center gap-4 text-left"
+                        >
+                          <div className="bg-blue-100 text-blue-700 font-bold w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm">
+                            {t.session_number}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-slate-900 text-sm">{t.body_area || 'No area recorded'}</span>
+                              <span className="text-slate-400 text-xs">•</span>
+                              <span className="text-xs text-slate-500">{new Date(t.treatment_date).toLocaleDateString()}</span>
                             </div>
-                            <div>
-                              <h4 className="font-bold text-slate-900">{t.body_area || 'Treatment Area'}</h4>
-                              <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                                <Calendar className="w-3 h-3" />
-                                {new Date(t.treatment_date).toLocaleDateString()}
+                            <div className="flex items-center gap-3 mt-1 flex-wrap">
+                              {t.wavelength && (
+                                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{t.wavelength}</span>
+                              )}
+                              {t.fluence_jcm2 && (
+                                <span className="text-xs text-slate-500">{t.fluence_jcm2} J/cm²</span>
+                              )}
+                              {(t.shots_fired_alex || t.shots_fired_yag) && (
+                                <span className="text-xs text-slate-500">{(t.shots_fired_alex || 0) + (t.shots_fired_yag || 0)} shots</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0 mr-2">
+                            <span className="text-xs text-slate-500">{t.users?.full_name || 'Tech'}</span>
+                          </div>
+                          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {/* Expanded Detail Section */}
+                        {isExpanded && (
+                          <div className="px-6 pb-5 pt-0 space-y-4 border-t border-slate-100 bg-slate-50/50">
+                            {/* Treatment Parameters Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-4">
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <span className="block text-xs text-slate-400 mb-1">Fluence Total</span>
+                                <span className="font-mono font-semibold text-slate-800">{t.fluence_jcm2 || '-'} J/cm²</span>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <span className="block text-xs text-slate-400 mb-1">Spot Size</span>
+                                <span className="font-mono font-semibold text-slate-800">{t.spot_size || '-'} mm</span>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <span className="block text-xs text-slate-400 mb-1">Spot Shape</span>
+                                <span className="font-mono font-semibold text-slate-800">{t.spot_shape || '-'}</span>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <span className="block text-xs text-slate-400 mb-1">Wavelength</span>
+                                <span className="font-mono font-semibold text-slate-800">{t.wavelength || '-'}</span>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <span className="block text-xs text-slate-400 mb-1">Rep Rate</span>
+                                <span className="font-mono font-semibold text-slate-800">{t.rep_rate ? t.rep_rate + ' Hz' : '-'}</span>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <span className="block text-xs text-slate-400 mb-1">Cooling</span>
+                                <span className="font-mono font-semibold text-slate-800">{t.cooling_level || '-'}</span>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <span className="block text-xs text-slate-400 mb-1">Pulse Duration (Alex)</span>
+                                <span className="font-mono font-semibold text-slate-800">{t.pulse_width_alex ? t.pulse_width_alex + ' ms' : '-'}</span>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <span className="block text-xs text-slate-400 mb-1">Pulse Duration (YAG)</span>
+                                <span className="font-mono font-semibold text-slate-800">{t.pulse_width_yag ? t.pulse_width_yag + ' ms' : '-'}</span>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <span className="block text-xs text-slate-400 mb-1">Shots Fired</span>
+                                <span className="font-mono font-semibold text-slate-800">{(t.shots_fired_alex || t.shots_fired_yag) ? ((t.shots_fired_alex || 0) + (t.shots_fired_yag || 0)) : '-'}</span>
                               </div>
                             </div>
-                          </div>
-                          <div className="text-right">
-                            <span className="block text-xs font-semibold text-slate-400 uppercase">Provider</span>
-                            <span className="block text-sm font-medium text-slate-800">{t.users?.full_name || 'Tech'}</span>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          <div className="bg-slate-100 rounded-lg p-3">
-                            <span className="block text-xs text-slate-500 mb-1">Fluence (J/cm²)</span>
-                            <span className="font-mono font-medium text-slate-800">{t.fluence || '-'}</span>
-                          </div>
-                          <div className="bg-slate-100 rounded-lg p-3">
-                            <span className="block text-xs text-slate-500 mb-1">Spot Size (mm)</span>
-                            <span className="font-mono font-medium text-slate-800">{t.spot_size || '-'}</span>
-                          </div>
-                        </div>
-                        
-                        {t.notes && (
-                          <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
-                            <span className="block text-xs font-semibold text-amber-800 uppercase mb-1">Clinical Notes</span>
-                            <p className="text-sm text-amber-900">{t.notes}</p>
-                          </div>
-                        )}
-                        {t.tech_notes && (
-                          <div className="bg-purple-50 rounded-lg p-4 border border-purple-100 mt-2">
-                            <span className="block text-xs font-semibold text-purple-800 uppercase mb-1">Internal Session Notes</span>
-                            <p className="text-sm text-purple-900">{t.tech_notes}</p>
+                            
+                            {/* Skin & Endpoint */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <span className="block text-xs text-slate-400 mb-1">Skin Type at Session</span>
+                                <span className="font-semibold text-slate-800">{t.skin_type_at_session || '-'}</span>
+                              </div>
+                              <div className="bg-white rounded-lg p-3 border border-slate-100">
+                                <span className="block text-xs text-slate-400 mb-1">Clinical Endpoint</span>
+                                <span className="font-semibold text-slate-800">{t.clinical_endpoint || '-'}</span>
+                              </div>
+                            </div>
+
+                            {/* Notes */}
+                            {t.notes && (
+                              <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
+                                <span className="block text-xs font-semibold text-amber-800 uppercase mb-1">Clinical Notes</span>
+                                <p className="text-sm text-amber-900">{t.notes}</p>
+                              </div>
+                            )}
+                            {t.tech_notes && (
+                              <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
+                                <span className="block text-xs font-semibold text-purple-800 uppercase mb-1">Internal Session Notes</span>
+                                <p className="text-sm text-purple-900">{t.tech_notes}</p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

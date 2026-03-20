@@ -386,6 +386,15 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
               <FileText className="w-3.5 h-3.5" />
               View Intake
             </button>
+            <a 
+              href={`/patients/${patientId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 text-xs font-bold px-3 py-1.5 rounded-full border border-teal-500/30 transition-colors no-underline"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              View Chart
+            </a>
             <span className="inline-flex items-center bg-blue-500/20 text-blue-300 text-xs font-bold px-2 py-1 rounded-full border border-blue-500/30">
               <span className="px-1">Session</span>
               <input 
