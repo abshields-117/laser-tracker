@@ -250,7 +250,18 @@ export default function PatientChartPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-slate-900 text-sm">{t.body_area || 'No area recorded'}</span>
+                              {/* Parse area string gracefully (legacy body_area vs new areas_treated jsonb) */}
+                              <span className="font-semibold text-slate-900 text-sm">
+                                {(() => {
+                                  if (t.areas_treated && Array.isArray(t.areas_treated.areas) && t.areas_treated.areas.length > 0) {
+                                    return t.areas_treated.areas.join(', ');
+                                  }
+                                  if (t.areas_treated && Array.isArray(t.areas_treated) && t.areas_treated.length > 0) {
+                                    return t.areas_treated.join(', ');
+                                  }
+                                  return t.body_area || 'No area recorded';
+                                })()}
+                              </span>
                               <span className="text-slate-400 text-xs">•</span>
                               <span className="text-xs text-slate-500">{new Date(t.treatment_date).toLocaleDateString()}</span>
                             </div>
