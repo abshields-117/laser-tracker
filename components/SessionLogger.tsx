@@ -57,6 +57,7 @@ interface TreatmentParams {
   spotShape: 'Square' | 'Round';
   spotSize: string;
   fluenceTotal: string;
+  fluenceAlex: string;
   pulseWidthAlex: string;
   pulseWidthYag: string;
   repRate: string;
@@ -140,6 +141,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
     spotShape: 'Square',
     spotSize: '',
     fluenceTotal: '',
+    fluenceAlex: '',
     pulseWidthAlex: '',
     pulseWidthYag: '',
     repRate: '',
