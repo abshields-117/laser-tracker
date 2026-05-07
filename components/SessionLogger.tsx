@@ -24,9 +24,13 @@ const MEDICAL_LABELS: Record<string, string> = {
 };
 // ───────────────────────────────────────────────────────────────
 
+const PICO_PROBES = ['Universal (Silver)', 'Honeycomb (755nm)', 'Carbon Peeling'];
+const PICO_WAVELENGTHS = ['1064nm', '755nm', '532nm'];
+const PICO_MODES = ['Standard', 'Dual Pulse/PTP', 'Multipulse', 'Long Pulse'];
+
 const BODY_AREAS = [
   'Underarms', 'Bikini/Brazilian', 'Full Legs', 'Back',
-  'Face', 'Neck', 'Arms', 'Chest',
+  'Face', 'Neck', 'Arms', 'Chest', 'Tattoo', 'Melasma/Pigment',
 ] as const;
 
 const SKIN_TYPES = ['I', 'II', 'III', 'IV', 'V', 'VI'] as const;
@@ -44,6 +48,11 @@ const COOLING_LEVELS = ['Off', 'Low', 'Medium', 'High', 'Max'] as const;
 // ─── Types// ───────────────────────────────────────────────────────────────────
 
 interface TreatmentParams {
+  machineUsed: 'Splendor X' | 'PicoKing';
+  picoProbe: string;
+  picoWavelength: string;
+  picoMode: string;
+  picoFreq: string;
   wavelength: string;
   spotShape: 'Square' | 'Round';
   spotSize: string;
@@ -122,6 +131,11 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
 
   // Treatment parameters
   const [params, setParams] = useState<TreatmentParams>({
+    machineUsed: 'Splendor X',
+    picoProbe: 'Universal (Silver)',
+    picoWavelength: '1064nm',
+    picoMode: 'Standard',
+    picoFreq: '',
     wavelength: '755nm (Alexandrite)',
     spotShape: 'Square',
     spotSize: '',
@@ -206,6 +220,11 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
             pulseWidthAlex: prev.pulse_width_ms?.toString() ?? '',
             pulseWidthYag: prev.pulse_width_ms?.toString() ?? '',
             coolingLevel: prev.cooling_setting ?? 'Medium',
+            machineUsed: prev.machine_used ?? 'Splendor X',
+            picoProbe: prev.pico_probe ?? 'Universal (Silver)',
+            picoWavelength: prev.pico_wavelength ?? '1064nm',
+            picoMode: prev.pico_mode ?? 'Standard',
+            picoFreq: prev.pico_frequency_hz?.toString() ?? '',
             // Preserve wavelength/shape from areas_treated jsonb if stored
             ...(prevAreas?.params ?? {}),
           }));
@@ -306,6 +325,11 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
         fluence_jcm2: params.fluenceTotal ? parseFloat(params.fluenceTotal) : null,
         pulse_width_ms: params.pulseWidthAlex ? parseFloat(params.pulseWidthAlex) : null,
         cooling_setting: params.coolingLevel,
+        machine_used: params.machineUsed,
+        pico_probe: params.machineUsed === 'PicoKing' ? params.picoProbe : null,
+        pico_wavelength: params.machineUsed === 'PicoKing' ? params.picoWavelength : null,
+        pico_mode: params.machineUsed === 'PicoKing' ? params.picoMode : null,
+        pico_frequency_hz: params.machineUsed === 'PicoKing' && params.picoFreq ? parseFloat(params.picoFreq) : null,
         overlap_percent: null,
         
         shots_fired_alex: params.wavelength.includes('Alexandrite') || params.wavelength === 'Blend' ? (params.numPulses ? parseInt(params.numPulses) : null) : null,
@@ -485,7 +509,30 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
       <SectionCard title="Treatment Parameters" icon={<Zap className="w-4 h-4 text-slate-500" />}>
         <div className="space-y-4">
 
-          {/* Wavelength */}
+          {/* Machine Selection */}
+          <div>
+            <Label>Machine Used</Label>
+            <div className="mt-1.5 flex gap-2 p-1 bg-slate-100 rounded-lg max-w-fit">
+              {(['Splendor X', 'PicoKing'] as const).map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => updateParam('machineUsed', m)}
+                  className={`px-6 py-2 rounded-md text-sm font-semibold transition-all ${
+                    params.machineUsed === m
+                      ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {params.machineUsed === 'Splendor X' ? (
+            <>
+              {/* Wavelength */}
           <div>
             <Label>Wavelength</Label>
             <div className="mt-1.5 flex flex-wrap gap-2">
@@ -585,6 +632,70 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
               <NumberInput value={params.numPulses} onChange={v => updateParam('numPulses', v)} placeholder="Total Shots" />
             </div>
           </div>
+            </>
+          ) : (
+            <>
+              {/* PicoKing UI */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label>Probe</Label>
+                  <div className="relative mt-1.5">
+                    <select
+                      value={params.picoProbe}
+                      onChange={e => updateParam('picoProbe', e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm appearance-none focus:ring-2 focus:ring-blue-500 bg-white pr-8"
+                    >
+                      {PICO_PROBES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Wavelength</Label>
+                  <div className="relative mt-1.5">
+                    <select
+                      value={params.picoWavelength}
+                      onChange={e => updateParam('picoWavelength', e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm appearance-none focus:ring-2 focus:ring-blue-500 bg-white pr-8"
+                    >
+                      {PICO_WAVELENGTHS.map(w => <option key={w} value={w}>{w}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Mode</Label>
+                  <div className="relative mt-1.5">
+                    <select
+                      value={params.picoMode}
+                      onChange={e => updateParam('picoMode', e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm appearance-none focus:ring-2 focus:ring-blue-500 bg-white pr-8"
+                    >
+                      {PICO_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Frequency (Hz)</Label>
+                  <NumberInput value={params.picoFreq} onChange={v => updateParam('picoFreq', v)} placeholder="e.g. 5" />
+                </div>
+                <div>
+                  <Label>Spot Size (mm)</Label>
+                  <NumberInput value={params.spotSize} onChange={v => updateParam('spotSize', v)} placeholder="2-10" />
+                </div>
+                <div>
+                  <Label>Fluence (J/cm²)</Label>
+                  <NumberInput value={params.fluenceAlex} onChange={v => updateParam('fluenceAlex', v)} placeholder="Warning > 12" />
+                </div>
+                <div>
+                  <Label>Number of Pulses (Total)</Label>
+                  <NumberInput value={params.numPulses} onChange={v => updateParam('numPulses', v)} placeholder="Total" />
+                </div>
+              </div>
+            </>
+          )}
+
         </div>
       </SectionCard>
 
