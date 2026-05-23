@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { AlertTriangle, CheckCircle, FileText, ChevronRight, Loader2 } from 'lucide-react';
 import CherryFinancing from '@/components/CherryFinancing';
+import { generateConsentSnapshot } from '../lib/consentSnapshot';
 
 export default function IntakeForm() {
   const [step, setStep] = useState(1);
@@ -94,19 +95,76 @@ export default function IntakeForm() {
     setSubmitError(null);
 
     try {
-      const { error } = await supabase.from('patients').insert({
-        first_name: formData.firstName,
-        last_name: formData.lastName,
+      // 1. Insert patient record
+      const { data: patientData, error: patientError } = await supabase
+        .from('patients')
+        .insert({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          dob: formData.dob,
+          email: formData.email || null,
+          phone: formData.phone || null,
+          baseline_skin_type: formData.skinType,
+          ethnic_background: formData.ethnicBackground,
+          medical_history_json: formData.medical,
+          medical_clearance_status: false,
+        })
+        .select('id')
+        .single();
+
+      if (patientError) throw patientError;
+
+      // 2. Generate signed consent snapshot
+      const consentId = crypto.randomUUID();
+      const signedAt = new Date().toISOString();
+      const consentHtml = generateConsentSnapshot({
+        patientName: `${formData.firstName} ${formData.lastName}`,
         dob: formData.dob,
-        email: formData.email || null,
-        phone: formData.phone || null,
-        baseline_skin_type: formData.skinType,
-        ethnic_background: formData.ethnicBackground,
-        medical_history_json: formData.medical,
-        medical_clearance_status: false,
+        phone: formData.phone,
+        email: formData.email,
+        serviceType: 'hair_removal',
+        signature: formData.signature,
+        signedAt,
+        consentId,
+        checkboxes: {
+          risks: formData.consent.risks,
+          preCare: true,
+          photos: formData.consent.photos ?? false,
+          payment: formData.consent.payment,
+        },
+        fitzpatrickType: formData.skinType,
       });
 
-      if (error) throw error;
+      // 3. Upload HTML to Supabase Storage
+      let storagePath: string | null = null;
+      try {
+        const fileName = `${consentId}.html`;
+        const { error: uploadError } = await supabase.storage
+          .from('consents')
+          .upload(fileName, new Blob([consentHtml], { type: 'text/html' }), { contentType: 'text/html' });
+        if (!uploadError) storagePath = fileName;
+      } catch {
+        // Storage upload failed — will fall back to inline consent_html column
+        console.warn('Consent storage upload failed, saving inline.');
+      }
+
+      // 4. Save consent record (immutable legal record)
+      await supabase.from('consent_records').insert({
+        id: consentId,
+        patient_id: patientData?.id ?? null,
+        patient_name: `${formData.firstName} ${formData.lastName}`,
+        service_type: 'hair_removal',
+        signed_at: signedAt,
+        signature: formData.signature,
+        storage_path: storagePath,
+        consent_html: storagePath ? null : consentHtml, // inline fallback
+        checkboxes_json: formData.consent,
+        fitzpatrick_type: formData.skinType,
+      });
+
+      // 5. Fallback: also save to localStorage in case of any DB issue
+      try { localStorage.setItem(`consent_${consentId}`, consentHtml); } catch { /* ignore */ }
+
       setSubmitted(true);
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : JSON.stringify(err));

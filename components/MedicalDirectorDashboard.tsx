@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { User, CheckCircle, Clock, FileText, Loader2, AlertTriangle, ChevronDown, ChevronUp, Shield, Shuffle, Eye } from 'lucide-react';
+import { User, CheckCircle, Clock, FileText, Loader2, AlertTriangle, ChevronDown, ChevronUp, Shield, Shuffle, Eye, ScrollText } from 'lucide-react';
+import ConsentViewer from './ConsentViewer';
 import { useRouter } from 'next/navigation';
 import PatientSearch from './PatientSearch';
 import { Users } from 'lucide-react';
@@ -29,6 +30,7 @@ export default function MedicalDirectorDashboard() {
   const [auditLoading, setAuditLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'audit' | 'all'>('pending');
+  const [consentViewer, setConsentViewer] = useState<{ patientName: string; patientId: string } | null>(null);
 
   useEffect(() => {
     fetchPendingIntakes();
@@ -261,6 +263,12 @@ export default function MedicalDirectorDashboard() {
                       >
                         View Full Chart
                       </button>
+                      <button
+                        onClick={() => setConsentViewer({ patientName: `${item.first_name} ${item.last_name}`, patientId: item.id })}
+                        className="px-4 py-2 text-sm text-purple-600 font-medium hover:bg-purple-50 rounded-lg border border-purple-200 flex items-center gap-2 justify-center"
+                      >
+                        <ScrollText className="w-4 h-4" /> View Consent
+                      </button>
                       <button 
                         onClick={() => handleApprove(item.id)}
                         className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-sm flex items-center gap-2 justify-center"
@@ -437,6 +445,15 @@ export default function MedicalDirectorDashboard() {
           )}
         </div>
       </div>
+      )}
+
+      {/* Consent Viewer Modal */}
+      {consentViewer && (
+        <ConsentViewer
+          patientName={consentViewer.patientName}
+          patientId={consentViewer.patientId}
+          onClose={() => setConsentViewer(null)}
+        />
       )}
     </div>
   );

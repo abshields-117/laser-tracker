@@ -1,0 +1,10 @@
+# Harlan Esthetics - Laser Tracker App Change Log
+
+## Date: 2026-02-26
+- **Intake Form:** Added "Photosensitive meds, retinol, retin-a" to the Medical Safety Check List.
+- **Global Styling:** Updated all inputs, dropdowns, and text boxes to use darker text (`text-slate-900`) for better visibility.
+- **Clinical Screen (Safety Check):** Removed the "STOP" logic for recent sun exposure. Exposure is now simply recorded and displays a caution message rather than completely blocking the treatment form.
+- **Clinical Screen (Treatment Settings):** Changed "Area Treated" from a single dropdown to a multi-select checkbox section, including an "Other" option with a free-form text input field.
+- **Packages (Intake & Clinical):** Added comprehensive package selection (Female, Men's, and Other/Free-form) to both the Intake screen (Step 1) and the Clinical Screen header.
+- **Clinical Screen (Progress Tracking):** Added the ability to manually override and edit a patient's session progress (e.g., changing "Session 4 of 8" manually by clicking the edit icon next to the progress bar).
+
