@@ -1,15 +1,33 @@
 "use client";
 
 import React, { useState } from 'react';
-import { User, CheckCircle, Clock, AlertTriangle, FileText } from 'lucide-react';
+import { User, CheckCircle, Clock, AlertTriangle, FileText, FileCheck } from 'lucide-react';
+import ConsentViewer from './ConsentViewer';
 
 const MOCK_QUEUE = [
-  { id: 4, name: 'Jessica Walters', dob: '1992-06-15', status: 'Pending Intake', notes: 'New enrollment. Needs GFE.' },
-  { id: 5, name: 'David Kim', dob: '1988-09-02', status: 'Review Treatments', notes: 'Adverse reaction reported (mild edema).' },
+  { 
+    id: 4, 
+    name: 'Jessica Walters', 
+    dob: '1992-06-15', 
+    status: 'Pending Intake', 
+    notes: 'New enrollment. Needs GFE.',
+    consentId: 'demo-consent-1',
+    mockConsentHtml: `<!DOCTYPE html><html><head><title>Mock Consent</title><style>body{font-family:sans-serif;padding:40px;max-width:800px;margin:0 auto;}.header{background:#D4AF37;color:white;padding:20px;text-align:center;margin-bottom:20px;}.warning{background:#fee;border:2px solid #d00;color:#d00;padding:10px;text-align:center;font-weight:bold;margin-bottom:20px;}.section{margin:20px 0;padding:15px;background:#f9f9f9;border-left:3px solid #6A9FAE;}</style></head><body><div class="header"><h1>HARLAN ESTHETICS</h1><p>SIGNED CONSENT DOCUMENT</p></div><div class="warning">⚠️ LEGALLY EXECUTED DOCUMENT — DO NOT ALTER OR MODIFY</div><div class="section"><h2>Patient Information</h2><p><strong>Name:</strong> Jessica Walters</p><p><strong>DOB:</strong> 1992-06-15</p><p><strong>Service:</strong> Laser Hair Removal</p></div><div class="section"><h2>Consent Items</h2><p>✓ I understand the risks and disclosures</p><p>✓ I consent to clinical photography</p><p>✓ I agree to pre/post care instructions</p><p>✓ I agree to payment terms</p></div><div class="section"><h2>Signature</h2><p style="font-family:serif;font-size:28px;font-style:italic;">Jessica Walters</p><p><small>Signed: 2025-05-20 14:32 CDT</small></p></div><div style="font-size:11px;color:#666;margin-top:30px;border-top:1px solid #ddd;padding-top:15px;">Consent ID: demo-consent-1 | Retained per Harlan Dental LLC Liability Policy 0100208711-3</div></body></html>`
+  },
+  { 
+    id: 5, 
+    name: 'David Kim', 
+    dob: '1988-09-02', 
+    status: 'Review Treatments', 
+    notes: 'Adverse reaction reported (mild edema).',
+    consentId: 'demo-consent-2',
+    mockConsentHtml: `<!DOCTYPE html><html><head><title>Mock Consent</title><style>body{font-family:sans-serif;padding:40px;max-width:800px;margin:0 auto;}.header{background:#D4AF37;color:white;padding:20px;text-align:center;margin-bottom:20px;}.warning{background:#fee;border:2px solid #d00;color:#d00;padding:10px;text-align:center;font-weight:bold;margin-bottom:20px;}.section{margin:20px 0;padding:15px;background:#f9f9f9;border-left:3px solid #7B5EA7;}</style></head><body><div class="header"><h1>HARLAN ESTHETICS</h1><p>SIGNED CONSENT DOCUMENT</p></div><div class="warning">⚠️ LEGALLY EXECUTED DOCUMENT — DO NOT ALTER OR MODIFY</div><div class="section"><h2>Patient Information</h2><p><strong>Name:</strong> David Kim</p><p><strong>DOB:</strong> 1988-09-02</p><p><strong>Service:</strong> Laser Tattoo Removal</p></div><div class="section"><h2>Tattoo Details</h2><p><strong>Colors:</strong> Black, Blue</p><p><strong>Age:</strong> 5-10 years</p><p><strong>Type:</strong> Professional</p></div><div class="section"><h2>Consent Items</h2><p>✓ I understand the risks and disclosures</p><p>✓ I consent to clinical photography</p><p>✓ I agree to pre/post care instructions</p><p>✓ I agree to payment terms</p><p>✓ I acknowledge incomplete removal possibility</p><p>✓ I understand ink color resistance</p></div><div class="section"><h2>Signature</h2><p style="font-family:serif;font-size:28px;font-style:italic;">David Kim</p><p><small>Signed: 2025-05-18 10:15 CDT</small></p></div><div style="font-size:11px;color:#666;margin-top:30px;border-top:1px solid #ddd;padding-top:15px;">Consent ID: demo-consent-2 | Retained per Harlan Dental LLC Liability Policy 0100208711-3</div></body></html>`
+  },
 ];
 
 export default function MedicalDirectorDashboard() {
   const [queue, setQueue] = useState(MOCK_QUEUE);
+  const [viewingConsent, setViewingConsent] = useState<{ name: string; consentId?: string; html?: string } | null>(null);
 
   const handleApprove = (id: number) => {
     setQueue(queue.filter(p => p.id !== id));
@@ -58,7 +76,14 @@ export default function MedicalDirectorDashboard() {
                 </div>
                 
                 <div className="flex flex-col gap-2">
-                  <button className="px-4 py-2 text-sm text-blue-600 font-medium hover:bg-blue-50 rounded">
+                  <button 
+                    onClick={() => setViewingConsent({ name: item.name, html: item.mockConsentHtml })}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white font-medium hover:bg-blue-700 rounded flex items-center gap-2 justify-center"
+                  >
+                    <FileCheck className="w-4 h-4" />
+                    View Consent
+                  </button>
+                  <button className="px-4 py-2 text-sm text-slate-600 font-medium hover:bg-slate-50 rounded border border-slate-300">
                     View Full Chart
                   </button>
                   <button 
@@ -86,6 +111,16 @@ export default function MedicalDirectorDashboard() {
           Generate Audit List
         </button>
       </div>
+
+      {/* Consent Viewer Modal */}
+      {viewingConsent && (
+        <ConsentViewer
+          consentId={viewingConsent.consentId}
+          consentHtml={viewingConsent.html}
+          patientName={viewingConsent.name}
+          onClose={() => setViewingConsent(null)}
+        />
+      )}
 
     </div>
   );
