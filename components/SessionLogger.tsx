@@ -154,8 +154,12 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
   const [otherArea, setOtherArea] = useState('');
   const [showOtherArea, setShowOtherArea] = useState(false);
 
-  // Clinical endpoint
-  const [clinicalEndpoint, setClinicalEndpoint] = useState('');
+  // Clinical endpoint (multi-select)
+  const [clinicalEndpoints, setClinicalEndpoints] = useState<string[]>([]);
+  const toggleEndpoint = (ep: string) =>
+    setClinicalEndpoints(prev =>
+      prev.includes(ep) ? prev.filter(e => e !== ep) : [...prev, ep]
+    );
 
   // Notes
   const [notes, setNotes] = useState('');
@@ -337,7 +341,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
         shots_fired_alex: params.wavelength.includes('Alexandrite') || params.wavelength === 'Blend' ? (params.numPulses ? parseInt(params.numPulses) : null) : null,
         shots_fired_yag: params.wavelength.includes('Nd:YAG') || params.wavelength === 'Blend' ? (params.numPulses ? parseInt(params.numPulses) : null) : null,
         tech_notes: techNotes || null,
-        clinical_endpoint: clinicalEndpoint || null,
+        clinical_endpoint: clinicalEndpoints.length > 0 ? clinicalEndpoints.join(', ') : null,
         notes: notes || null,
       });
 
@@ -744,19 +748,19 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
 
       {/* ── Section 5: Clinical Endpoint ──────────────────────────────── */}
       <SectionCard title="Clinical Endpoint / Reaction" icon={<CheckCircle2 className="w-4 h-4 text-slate-500" />}>
+        <p className="text-xs text-slate-400 mb-3">Select all that apply</p>
         <div className="flex flex-col sm:flex-row gap-3">
           {CLINICAL_ENDPOINTS.map(ep => (
             <label key={ep} className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg border cursor-pointer transition-all text-sm ${
-              clinicalEndpoint === ep
+              clinicalEndpoints.includes(ep)
                 ? 'bg-green-50 border-green-400 text-green-800 font-medium'
                 : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
             }`}>
               <input
-                type="radio"
-                name="clinicalEndpoint"
-                checked={clinicalEndpoint === ep}
-                onChange={() => setClinicalEndpoint(ep)}
-                className="w-4 h-4 text-green-600 focus:ring-green-500"
+                type="checkbox"
+                checked={clinicalEndpoints.includes(ep)}
+                onChange={() => toggleEndpoint(ep)}
+                className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
               />
               {ep}
             </label>
