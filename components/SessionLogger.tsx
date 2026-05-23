@@ -9,6 +9,7 @@ export default function SessionLogger() {
   const totalSessions = 8;
   const [skinCheck, setSkinCheck] = useState({ rechecked: false, type: 'III', sunExposure: false });
   const [exposedAreas, setExposedAreas] = useState<string[]>([]);
+  const [treatmentType, setTreatmentType] = useState('hair_removal');
   const [areaTreated, setAreaTreated] = useState('Underarms');
 
   // Mock previous session data (This would come from DB)
@@ -38,6 +39,11 @@ export default function SessionLogger() {
     } else {
       setExposedAreas([...exposedAreas, area]);
     }
+  };
+
+  // Get machine name based on treatment type
+  const getMachineName = () => {
+    return treatmentType === 'tattoo_removal' ? 'PicoKing EL950' : 'Splendor X';
   };
 
   return (
@@ -174,10 +180,28 @@ export default function SessionLogger() {
       <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 transition-opacity ${(!skinCheck.rechecked || isTreatmentBlocked) ? 'opacity-50 pointer-events-none' : ''}`}>
         <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
           <Zap className="w-5 h-5 text-amber-500" />
-          Treatment Settings (Splendor X)
+          Treatment Settings ({getMachineName()})
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Treatment Type Selector */}
+          <div className="col-span-1 md:col-span-2 space-y-2">
+            <label className="text-sm font-medium text-slate-700">Treatment Type</label>
+            <select 
+              className="w-full p-2 border border-slate-300 rounded-md bg-white font-semibold"
+              value={treatmentType}
+              onChange={(e) => setTreatmentType(e.target.value)}
+            >
+              <option value="hair_removal">Laser Hair Removal</option>
+              <option value="tattoo_removal">Laser Tattoo Removal</option>
+              <option value="carbon_peel">Carbon Peel</option>
+              <option value="pico_pigment">Pico Pigment</option>
+              <option value="pico_skin_tightening">Pico Skin Tightening</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          {/* Area Treated - changes based on treatment type */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">Area Treated</label>
             <select 
@@ -185,93 +209,181 @@ export default function SessionLogger() {
               value={areaTreated}
               onChange={(e) => setAreaTreated(e.target.value)}
             >
-              <option value="Underarms">Underarms</option>
-              <option value="Bikini">Bikini / Brazilian</option>
-              <option value="Legs">Full Legs</option>
-              <option value="Back">Back</option>
-              <option value="Face">Face</option>
+              {treatmentType === 'tattoo_removal' ? (
+                <>
+                  <option value="Arm">Arm</option>
+                  <option value="Wrist">Wrist</option>
+                  <option value="Ankle">Ankle</option>
+                  <option value="Neck">Neck</option>
+                  <option value="Back">Back</option>
+                  <option value="Chest">Chest</option>
+                  <option value="Shoulder">Shoulder</option>
+                  <option value="Leg">Leg</option>
+                  <option value="Other">Other</option>
+                </>
+              ) : (
+                <>
+                  <option value="Underarms">Underarms</option>
+                  <option value="Bikini">Bikini / Brazilian</option>
+                  <option value="Legs">Full Legs</option>
+                  <option value="Back">Back</option>
+                  <option value="Face">Face</option>
+                </>
+              )}
             </select>
           </div>
 
+          {/* Spot Size - changes based on treatment type */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-slate-700">Spot Size</label>
             <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
-              <option>18mm (Square)</option>
-              <option>20mm (Square)</option>
-              <option>24mm (Square)</option>
+              {treatmentType === 'tattoo_removal' ? (
+                <>
+                  <option>2mm</option>
+                  <option>4mm</option>
+                  <option>6mm</option>
+                  <option>8mm</option>
+                  <option>10mm</option>
+                </>
+              ) : (
+                <>
+                  <option>18mm (Square)</option>
+                  <option>20mm (Square)</option>
+                  <option>24mm (Square)</option>
+                </>
+              )}
             </select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Fluence (J/cm²)</label>
-            <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="14" />
-          </div>
+          {/* Conditional fields based on treatment type */}
+          {treatmentType === 'tattoo_removal' ? (
+            <>
+              {/* Wavelength Used */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Wavelength Used</label>
+                <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
+                  <option>532nm (Green/Red ink)</option>
+                  <option>755nm (Blue/Black ink)</option>
+                  <option>1064nm (Black/Dark ink)</option>
+                  <option>Multi</option>
+                </select>
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Pulse Width (ms)</label>
-            <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="20" />
-          </div>
+              {/* Energy (mJ) */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Energy (mJ)</label>
+                <input 
+                  type="number" 
+                  className="w-full p-2 border border-slate-300 rounded-md" 
+                  placeholder="100-900"
+                  min="100"
+                  max="900"
+                />
+              </div>
 
-          {/* New Clinical Fields (v2.5) */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-              <Gauge className="w-4 h-4 text-slate-400" />
-              Overlap (%)
-            </label>
-            <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
-              <option>10%</option>
-              <option>15% (Recommended)</option>
-              <option>20%</option>
-              <option>25%</option>
-            </select>
-          </div>
+              {/* Pulse Mode */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Pulse Mode</label>
+                <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
+                  <option>Single Pulse</option>
+                  <option>PTP (Dual Pulse)</option>
+                </select>
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-              <Thermometer className="w-4 h-4 text-slate-400" />
-              Cooling (Zimmer)
-            </label>
-            <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
-              <option>High (Level 5-6)</option>
-              <option>Medium (Level 3-4)</option>
-              <option>Low (Level 1-2)</option>
-            </select>
-          </div>
+              {/* Ink Response (Clinical Endpoint) */}
+              <div className="col-span-1 md:col-span-2 space-y-2">
+                <label className="text-sm font-bold text-slate-800">Ink Response (Clinical Endpoint)</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer bg-green-50 px-3 py-2 rounded border border-green-200 hover:border-green-400">
+                    <input type="radio" name="inkResponse" className="w-4 h-4 text-green-600" />
+                    <span className="text-sm text-slate-700">✅ Immediate Whitening (Frosting)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-blue-300">
+                    <input type="radio" name="inkResponse" className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm text-slate-700">Mild Erythema</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-red-300">
+                    <input type="radio" name="inkResponse" className="w-4 h-4 text-red-600" />
+                    <span className="text-sm text-slate-700">No Response</span>
+                  </label>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Hair Removal Settings */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Fluence (J/cm²)</label>
+                <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="14" />
+              </div>
 
-          {/* Shots Fired Section */}
-          <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Alex (755nm)</label>
-              <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
-              <p className="text-xs text-slate-400">Prev: {previousSession.shotsAlex}</p>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Nd:YAG (1064nm)</label>
-              <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
-              <p className="text-xs text-slate-400">Prev: {previousSession.shotsYag}</p>
-            </div>
-          </div>
-        </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Pulse Width (ms)</label>
+                <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="20" />
+              </div>
 
-        <div className="mt-6 space-y-3">
-          <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
-            Clinical Endpoint Reached?
-            <span className="text-xs font-normal text-slate-500">(Must observe PFE/Erythema)</span>
-          </label>
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-blue-300">
-              <input type="radio" name="endpoint" className="w-4 h-4 text-blue-600" />
-              <span className="text-sm text-slate-700">Mild Erythema</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-blue-300">
-              <input type="radio" name="endpoint" className="w-4 h-4 text-blue-600" />
-              <span className="text-sm text-slate-700">PFE (Edema)</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-red-300">
-              <input type="radio" name="endpoint" className="w-4 h-4 text-red-600" />
-              <span className="text-sm text-slate-700">None / Poor Response</span>
-            </label>
-          </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                  <Gauge className="w-4 h-4 text-slate-400" />
+                  Overlap (%)
+                </label>
+                <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
+                  <option>10%</option>
+                  <option>15% (Recommended)</option>
+                  <option>20%</option>
+                  <option>25%</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                  <Thermometer className="w-4 h-4 text-slate-400" />
+                  Cooling (Zimmer)
+                </label>
+                <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
+                  <option>High (Level 5-6)</option>
+                  <option>Medium (Level 3-4)</option>
+                  <option>Low (Level 1-2)</option>
+                </select>
+              </div>
+
+              {/* Shots Fired Section - Only for hair removal */}
+              <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Alex (755nm)</label>
+                  <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
+                  <p className="text-xs text-slate-400">Prev: {previousSession.shotsAlex}</p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Nd:YAG (1064nm)</label>
+                  <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
+                  <p className="text-xs text-slate-400">Prev: {previousSession.shotsYag}</p>
+                </div>
+              </div>
+
+              {/* Clinical Endpoint - Only for hair removal */}
+              <div className="col-span-1 md:col-span-2 space-y-3">
+                <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  Clinical Endpoint Reached?
+                  <span className="text-xs font-normal text-slate-500">(Must observe PFE/Erythema)</span>
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-blue-300">
+                    <input type="radio" name="endpoint" className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm text-slate-700">Mild Erythema</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-blue-300">
+                    <input type="radio" name="endpoint" className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm text-slate-700">PFE (Edema)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-red-300">
+                    <input type="radio" name="endpoint" className="w-4 h-4 text-red-600" />
+                    <span className="text-sm text-slate-700">None / Poor Response</span>
+                  </label>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="mt-6 space-y-2">
