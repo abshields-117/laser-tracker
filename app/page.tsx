@@ -8,6 +8,8 @@ import PatientSearch from '@/components/PatientSearch';
 import MedicalDirectorDashboard from '@/components/MedicalDirectorDashboard';
 import PatientPortal from '@/components/PatientPortal';
 import IntakeForm from '@/components/IntakeForm';
+
+export const dynamic = 'force-dynamic';
 import { User, Activity, ShieldCheck, LogOut, FileText, Loader2 } from 'lucide-react';
 
 type UserRole = 'admin' | 'md' | 'tech' | null;

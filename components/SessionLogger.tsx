@@ -318,6 +318,9 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
         skin_type_at_session: skinTypeAtSession || null,
         sun_exposure_check: sunExposure,
         sun_exposed_areas: sunExposure ? sunExposedAreas : null,
+        pre_check_consent_signed: preChecklist.consentSigned,
+        pre_check_hair_shaved: preChecklist.hairShaved,
+        pre_check_area_cleaned: preChecklist.areaCleaned,
         areas_treated: {
           areas: allAreas,
           params: {
@@ -833,6 +836,13 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
       </SectionCard>
 
       {/* ── Section 7: Save ───────────────────────────────────────────── */}
+      {!preChecklist.consentSigned && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4" />
+          ⚠️ Cannot save session — Consent not confirmed on file.
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
           {error}
@@ -848,9 +858,9 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
 
       <button
         onClick={handleSave}
-        disabled={saving || areasTreated.length === 0}
+        disabled={saving || areasTreated.length === 0 || !preChecklist.consentSigned}
         className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300
-          text-white font-semibold py-3.5 rounded-xl shadow-sm transition-all text-sm uppercase tracking-wide"
+          text-white font-semibold py-3.5 rounded-xl shadow-sm transition-all text-sm uppercase tracking-wide min-h-[52px]"
       >
         {saving ? (
           <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>

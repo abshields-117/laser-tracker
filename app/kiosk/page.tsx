@@ -3,6 +3,8 @@
 import React from 'react';
 import IntakeForm from '@/components/IntakeForm';
 
+export const dynamic = 'force-dynamic';
+
 export default function KioskPage() {
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col">

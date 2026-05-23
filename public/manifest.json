@@ -1,0 +1,13 @@
+{
+  "name": "Harlan Esthetics Laser Tracker",
+  "short_name": "Laser Tracker",
+  "description": "Patient intake and treatment tracking for Harlan Esthetics",
+  "start_url": "/kiosk",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "any", "type": "image/x-icon" }
+  ]
+}

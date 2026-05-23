@@ -9,6 +9,7 @@ import { generateConsentSnapshot } from '../lib/consentSnapshot';
 export default function IntakeForm() {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
+    serviceType: '' as 'hair_removal' | 'tattoo_removal' | 'skin_treatment' | '',
     firstName: '', lastName: '', dob: '', email: '', phone: '',
     ethnicBackground: '',
     skinType: 'III',
@@ -30,9 +31,9 @@ export default function IntakeForm() {
     },
     consent: {
       risks: false,
+      preCare: false,
       photos: false,
-      payment: false,
-      cancellation: false
+      payment: false
     },
     signature: ''
   });
@@ -77,6 +78,10 @@ export default function IntakeForm() {
   const handleNext = () => {
     setValidationError(null);
     if (step === 1) {
+      if (!formData.serviceType) {
+        setValidationError('Please select a service type.');
+        return;
+      }
       if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.dob || !formData.ethnicBackground || !formData.phone.trim() || !formData.email.trim() || !formData.desiredPackage) {
         setValidationError('Please fill in all required fields before continuing.');
         return;
@@ -122,14 +127,14 @@ export default function IntakeForm() {
         dob: formData.dob,
         phone: formData.phone,
         email: formData.email,
-        serviceType: 'hair_removal',
+        serviceType: formData.serviceType as 'hair_removal' | 'tattoo_removal' | 'skin_treatment',
         signature: formData.signature,
         signedAt,
         consentId,
         checkboxes: {
           risks: formData.consent.risks,
-          preCare: true,
-          photos: formData.consent.photos ?? false,
+          preCare: formData.consent.preCare,
+          photos: formData.consent.photos,
           payment: formData.consent.payment,
         },
         fitzpatrickType: formData.skinType,
@@ -153,7 +158,7 @@ export default function IntakeForm() {
         id: consentId,
         patient_id: patientData?.id ?? null,
         patient_name: `${formData.firstName} ${formData.lastName}`,
-        service_type: 'hair_removal',
+        service_type: formData.serviceType,
         signed_at: signedAt,
         signature: formData.signature,
         storage_path: storagePath,
@@ -214,18 +219,76 @@ export default function IntakeForm() {
             Your Details
           </h2>
           
+          {/* Service Type Selector */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-3">Select Service Type *</label>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, serviceType: 'hair_removal'})}
+                className={`min-h-[52px] w-full rounded-xl p-4 border-2 transition-all text-left ${
+                  formData.serviceType === 'hair_removal'
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-slate-200 bg-white hover:border-blue-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🔵</span>
+                  <div>
+                    <div className="font-bold text-slate-900 text-base">Laser Hair Removal</div>
+                    <div className="text-xs text-slate-500">Permanent hair reduction treatment</div>
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, serviceType: 'tattoo_removal'})}
+                className={`min-h-[52px] w-full rounded-xl p-4 border-2 transition-all text-left ${
+                  formData.serviceType === 'tattoo_removal'
+                    ? 'border-purple-500 bg-purple-50'
+                    : 'border-slate-200 bg-white hover:border-purple-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🟣</span>
+                  <div>
+                    <div className="font-bold text-slate-900 text-base">Laser Tattoo Removal</div>
+                    <div className="text-xs text-slate-500">Fading or removing unwanted tattoos</div>
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, serviceType: 'skin_treatment'})}
+                className={`min-h-[52px] w-full rounded-xl p-4 border-2 transition-all text-left ${
+                  formData.serviceType === 'skin_treatment'
+                    ? 'border-teal-500 bg-teal-50'
+                    : 'border-slate-200 bg-white hover:border-teal-300'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🟢</span>
+                  <div>
+                    <div className="font-bold text-slate-900 text-base">Pico Skin Treatment</div>
+                    <div className="text-xs text-slate-500">Pigmentation, melasma, skin rejuvenation</div>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+          
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700">First Name</label>
               <input 
-                type="text" className="w-full p-2 border rounded-md text-slate-900" 
+                type="text" className="w-full p-2 border rounded-md text-slate-900 text-base" 
                 value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700">Last Name</label>
               <input 
-                type="text" className="w-full p-2 border rounded-md text-slate-900" 
+                type="text" className="w-full p-2 border rounded-md text-slate-900 text-base" 
                 value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})}
               />
             </div>
@@ -234,7 +297,7 @@ export default function IntakeForm() {
           <div>
             <label className="block text-sm font-medium text-slate-700">Date of Birth</label>
             <input 
-              type="date" className="w-full p-2 border rounded-md text-slate-900" 
+              type="date" className="w-full p-2 border rounded-md text-slate-900 text-base" 
               value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})}
             />
           </div>
@@ -243,7 +306,7 @@ export default function IntakeForm() {
             <label className="block text-sm font-medium text-slate-700">Ethnic Background</label>
             <p className="text-xs text-slate-400 mb-1">Helps us determine your Fitzpatrick skin type for safe laser settings.</p>
             <select 
-              className="w-full p-2 border rounded-md text-slate-900 bg-white"
+              className="w-full p-2 border rounded-md text-slate-900 bg-white text-base"
               value={formData.ethnicBackground}
               onChange={e => setFormData({...formData, ethnicBackground: e.target.value})}
             >
@@ -258,14 +321,14 @@ export default function IntakeForm() {
             <div>
               <label className="block text-sm font-medium text-slate-700">Email</label>
               <input 
-                type="email" className="w-full p-2 border rounded-md text-slate-900" 
+                type="email" className="w-full p-2 border rounded-md text-slate-900 text-base" 
                 value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700">Phone</label>
               <input 
-                type="tel" className="w-full p-2 border rounded-md text-slate-900" 
+                type="tel" className="w-full p-2 border rounded-md text-slate-900 text-base" 
                 value={formData.phone} onChange={e => setFormData({...formData, phone: formatPhoneNumber(e.target.value)})}
               />
             </div>
@@ -274,7 +337,7 @@ export default function IntakeForm() {
           <div>
             <label className="block text-sm font-medium text-slate-700">Package Desired</label>
             <select 
-              className="w-full p-2 border rounded-md text-slate-900 bg-white"
+              className="w-full p-2 border rounded-md text-slate-900 bg-white text-base"
               value={formData.desiredPackage}
               onChange={e => setFormData({...formData, desiredPackage: e.target.value})}
             >
@@ -293,7 +356,7 @@ export default function IntakeForm() {
             <div>
               <label className="block text-sm font-medium text-slate-700">Specify Package/Area</label>
               <input 
-                type="text" className="w-full p-2 border rounded-md text-slate-900" 
+                type="text" className="w-full p-2 border rounded-md text-slate-900 text-base" 
                 value={formData.desiredPackageOther} onChange={e => setFormData({...formData, desiredPackageOther: e.target.value})}
               />
             </div>
@@ -305,8 +368,7 @@ export default function IntakeForm() {
             </div>
           )}
 
-          <button onClick={handleNext} className="w-full mt-4 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 flex items-center justify-center gap-2">
-            Next: Medical History <ChevronRight className="w-4 h-4" />
+          <button onClick={handleNext} className="w-full mt-4 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 flex items-center justify-center gap-2 min-h-[52px]">            Next: Medical History <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       )}
@@ -324,7 +386,7 @@ export default function IntakeForm() {
             {medicalQuestions.map(item => (
               <label key={item.key} className="flex items-start gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
                 <input 
-                  type="checkbox" className="mt-1 w-5 h-5 text-blue-600 rounded"
+                  type="checkbox" className="mt-1 w-6 h-6 text-blue-600 rounded"
                   checked={(formData.medical as Record<string, boolean | string>)[item.key] as boolean}
                   onChange={e => setFormData({...formData, medical: {...formData.medical, [item.key]: e.target.checked}})}
                 />
@@ -336,7 +398,7 @@ export default function IntakeForm() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Current Medications</label>
             <textarea 
-              className="w-full p-2 border rounded-md h-20 text-sm text-slate-900" 
+              className="w-full p-2 border rounded-md h-20 text-sm text-slate-900 text-base" 
               placeholder="List all medications, vitamins, and supplements..."
               value={formData.medical.medications}
               onChange={e => setFormData({...formData, medical: {...formData.medical, medications: e.target.value}})}
@@ -344,8 +406,47 @@ export default function IntakeForm() {
           </div>
 
           <div className="flex gap-4 mt-4">
-            <button onClick={handleBack} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-lg font-semibold hover:bg-slate-200">Back</button>
-            <button onClick={handleNext} className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700">Next: Consent</button>
+            <button onClick={handleBack} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-lg font-semibold hover:bg-slate-200 min-h-[52px]">Back</button>
+            <button onClick={handleNext} className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 min-h-[52px]">Next: Consent</button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Medical History (Contraindications) */}
+      {step === 2 && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            Medical Safety Check
+          </h2>
+          <p className="text-sm text-slate-500">Please answer honestly for your safety.</p>
+
+          <div className="space-y-3">
+            {medicalQuestions.map(item => (
+              <label key={item.key} className="flex items-start gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
+                <input 
+                  type="checkbox" className="mt-1 w-6 h-6 text-blue-600 rounded"
+                  checked={(formData.medical as Record<string, boolean | string>)[item.key] as boolean}
+                  onChange={e => setFormData({...formData, medical: {...formData.medical, [item.key]: e.target.checked}})}
+                />
+                <span className="text-sm text-slate-700">{item.label}</span>
+              </label>
+            ))}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Current Medications</label>
+            <textarea 
+              className="w-full p-2 border rounded-md h-20 text-sm text-slate-900 text-base" 
+              placeholder="List all medications, vitamins, and supplements..."
+              value={formData.medical.medications}
+              onChange={e => setFormData({...formData, medical: {...formData.medical, medications: e.target.value}})}
+            ></textarea>
+          </div>
+
+          <div className="flex gap-4 mt-4">
+            <button onClick={handleBack} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-lg font-semibold hover:bg-slate-200 min-h-[52px]">Back</button>
+            <button onClick={handleNext} className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 min-h-[52px]">Next: Consent</button>
           </div>
         </div>
       )}
@@ -358,28 +459,71 @@ export default function IntakeForm() {
             Consent & Sign
           </h2>
 
-          <div className="h-40 overflow-y-auto p-3 bg-slate-50 rounded border border-slate-200 text-xs text-slate-600 space-y-2">
-            <p><strong>1. Risks:</strong> I understand laser hair removal may cause redness, swelling, blistering, or changes in skin pigment.</p>
-            <p><strong>2. Results:</strong> I understand that multiple sessions are required and permanent reduction is not guaranteed.</p>
-            <p><strong>3. Financial:</strong> I understand payment is due at time of service and packages are non-refundable.</p>
+          <div className="max-h-[280px] overflow-y-auto p-4 bg-slate-50 rounded border border-slate-200 text-xs text-slate-700 space-y-2">
+            {formData.serviceType === 'hair_removal' && (
+              <>
+                <p><strong>1. RISKS:</strong> I understand laser hair removal may cause temporary redness, swelling, blistering, or changes in skin pigmentation. Rare risks include burns or scarring.</p>
+                <p><strong>2. RESULTS:</strong> Multiple sessions are required. Permanent hair reduction (not complete removal) is not guaranteed. Individual results vary.</p>
+                <p><strong>3. PRE/POST CARE:</strong> I agree to avoid sun exposure, tanning beds, and self-tanners for 4 weeks before and after each treatment. I will notify staff of any medication changes.</p>
+                <p><strong>4. PHOTOS:</strong> I consent to before/after photos for clinical documentation. These will not be used publicly without separate written authorization.</p>
+                <p><strong>5. FINANCIAL:</strong> Payment is due at time of service. Packages are non-refundable. Missed appointments without 24-hour notice may be charged a $50 cancellation fee.</p>
+              </>
+            )}
+            {formData.serviceType === 'tattoo_removal' && (
+              <>
+                <p><strong>1. RISKS:</strong> Laser tattoo removal may cause redness, swelling, blistering, scabbing, and pigment changes (lightening or darkening). Rare risks include scarring and permanent skin texture changes.</p>
+                <p><strong>2. INCOMPLETE REMOVAL:</strong> Complete removal is NOT guaranteed. Results vary by ink color, depth, age, and skin type. 6–15+ sessions are typically required.</p>
+                <p><strong>3. INK COLORS:</strong> Black/dark blue inks respond best. Red, green, yellow, and light colors are significantly harder to remove and may not fully clear.</p>
+                <p><strong>4. PARADOXICAL DARKENING:</strong> Certain inks (white, flesh-tone, iron oxide) may darken upon laser exposure. This risk has been explained to me.</p>
+                <p><strong>5. PRE/POST CARE:</strong> Keep treated area clean, protected from sun, and moisturized. Do not pick or scratch treated skin. Notify staff of any medication changes.</p>
+                <p><strong>6. PHOTOS:</strong> I consent to before/after photos for clinical documentation. These will not be used publicly without separate written authorization.</p>
+                <p><strong>7. FINANCIAL:</strong> Payment is due at time of service. Packages are non-refundable.</p>
+                <p><strong>8. INSURANCE:</strong> I understand a signed consent form is required by the provider's liability insurance (Policy 0100208711-3) for this service.</p>
+              </>
+            )}
+            {formData.serviceType === 'skin_treatment' && (
+              <>
+                <p><strong>1. RISKS:</strong> Pico laser skin treatments may cause temporary redness, swelling, darkening of targeted spots, or pigment changes. Rare risks include blistering or scarring.</p>
+                <p><strong>2. RESULTS:</strong> Results vary by individual, skin type, and condition treated. Multiple sessions may be required. Results are not guaranteed.</p>
+                <p><strong>3. PRE/POST CARE:</strong> Avoid sun for 4 weeks before and after treatment. No retinol or active exfoliants for 5 days prior. Use SPF 30+ daily after treatment.</p>
+                <p><strong>4. PHOTOS:</strong> I consent to before/after photos for clinical documentation. These will not be used publicly without separate written authorization.</p>
+                <p><strong>5. FINANCIAL:</strong> Payment is due at time of service. Packages are non-refundable.</p>
+              </>
+            )}
           </div>
 
           <div className="space-y-2">
             <label className="flex items-center gap-2">
               <input 
-                type="checkbox" className="w-4 h-4 text-blue-600"
+                type="checkbox" className="w-6 h-6 text-blue-600"
                 checked={formData.consent.risks}
                 onChange={e => setFormData({...formData, consent: {...formData.consent, risks: e.target.checked}})}
               />
-              <span className="text-sm text-slate-700">I have read and accept the risks.</span>
+              <span className="text-sm text-slate-700">I have read and understand all risks listed above</span>
             </label>
             <label className="flex items-center gap-2">
               <input 
-                type="checkbox" className="w-4 h-4 text-blue-600"
+                type="checkbox" className="w-6 h-6 text-blue-600"
+                checked={formData.consent.preCare}
+                onChange={e => setFormData({...formData, consent: {...formData.consent, preCare: e.target.checked}})}
+              />
+              <span className="text-sm text-slate-700">I agree to follow all pre/post care instructions</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input 
+                type="checkbox" className="w-6 h-6 text-blue-600"
+                checked={formData.consent.photos}
+                onChange={e => setFormData({...formData, consent: {...formData.consent, photos: e.target.checked}})}
+              />
+              <span className="text-sm text-slate-700">I consent to clinical photography</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input 
+                type="checkbox" className="w-6 h-6 text-blue-600"
                 checked={formData.consent.payment}
                 onChange={e => setFormData({...formData, consent: {...formData.consent, payment: e.target.checked}})}
               />
-              <span className="text-sm text-slate-700">I agree to the financial policy.</span>
+              <span className="text-sm text-slate-700">I agree to the financial policy</span>
             </label>
           </div>
 
@@ -387,7 +531,7 @@ export default function IntakeForm() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Digital Signature</label>
             <input 
               type="text" 
-              className="w-full p-3 border-b-2 border-slate-300 bg-slate-50 focus:border-blue-500 outline-none font-serif italic text-lg text-slate-900"
+              className="w-full p-3 border-b-2 border-slate-300 bg-slate-50 focus:border-blue-500 outline-none font-serif italic text-lg text-slate-900 text-base"
               placeholder="Type your full name to sign"
               value={formData.signature}
               onChange={e => setFormData({...formData, signature: e.target.value})}
@@ -402,11 +546,11 @@ export default function IntakeForm() {
           )}
 
           <div className="flex gap-4 mt-4">
-            <button onClick={handleBack} disabled={submitting} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-lg font-semibold hover:bg-slate-200 disabled:opacity-50">Back</button>
+            <button onClick={handleBack} disabled={submitting} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-lg font-semibold hover:bg-slate-200 disabled:opacity-50 min-h-[52px]">Back</button>
             <button 
               onClick={handleSubmit} 
-              disabled={!formData.signature || !formData.consent.risks || !formData.consent.payment || submitting}
-              className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={!formData.signature || !formData.consent.risks || !formData.consent.preCare || !formData.consent.photos || !formData.consent.payment || submitting}
+              className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[52px]"
             >
               {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</> : 'Submit Intake'}
             </button>

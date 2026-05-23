@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { useParams, useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft, User, FileText, Activity, Calendar, CheckCircle, ChevronDown } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 type Patient = any;
 type TreatmentPlan = any;
 type Treatment = any;

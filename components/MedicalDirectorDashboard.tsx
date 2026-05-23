@@ -31,6 +31,8 @@ export default function MedicalDirectorDashboard() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'audit' | 'all'>('pending');
   const [consentViewer, setConsentViewer] = useState<{ patientName: string; patientId: string } | null>(null);
+  const [approveMode, setApproveMode] = useState<{ id: string; withNote: boolean } | null>(null);
+  const [approvalNote, setApprovalNote] = useState('');
 
   useEffect(() => {
     fetchPendingIntakes();
@@ -54,15 +56,25 @@ export default function MedicalDirectorDashboard() {
     }
   }
 
-  const handleApprove = async (id: string) => {
+  const handleApprove = async (id: string, note?: string) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No authenticated user');
+
       const { error } = await supabase
         .from('patients')
-        .update({ medical_clearance_status: true })
+        .update({ 
+          medical_clearance_status: true,
+          cleared_by: user.id,
+          cleared_at: new Date().toISOString(),
+          clearance_notes: note || null
+        })
         .eq('id', id);
 
       if (error) throw error;
       setQueue(queue.filter(p => p.id !== id));
+      setApproveMode(null);
+      setApprovalNote('');
     } catch (err) {
       console.error('Error approving patient:', err);
       alert('Failed to approve patient.');
@@ -269,12 +281,48 @@ export default function MedicalDirectorDashboard() {
                       >
                         <ScrollText className="w-4 h-4" /> View Consent
                       </button>
-                      <button 
-                        onClick={() => handleApprove(item.id)}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-sm flex items-center gap-2 justify-center"
-                      >
-                        <CheckCircle className="w-4 h-4" /> Approve & Sign Off
-                      </button>
+                      {approveMode?.id === item.id ? (
+                        <div className="space-y-2">
+                          {approveMode?.withNote && (
+                            <textarea
+                              value={approvalNote}
+                              onChange={(e) => setApprovalNote(e.target.value)}
+                              placeholder="Optional approval notes..."
+                              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                              rows={3}
+                            />
+                          )}
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => handleApprove(item.id, approvalNote)}
+                              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg shadow-sm flex items-center gap-2 justify-center"
+                            >
+                              <CheckCircle className="w-4 h-4" /> Confirm
+                            </button>
+                            <button 
+                              onClick={() => { setApproveMode(null); setApprovalNote(''); }}
+                              className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold rounded-lg"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => handleApprove(item.id)}
+                            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-sm flex items-center gap-2 justify-center text-sm"
+                          >
+                            <CheckCircle className="w-4 h-4" /> Approve ✓
+                          </button>
+                          <button 
+                            onClick={() => setApproveMode({ id: item.id, withNote: true })}
+                            className="px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 font-semibold rounded-lg text-xs border border-green-300"
+                          >
+                            + Note
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
