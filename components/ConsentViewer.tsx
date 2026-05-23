@@ -2,48 +2,81 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Printer, Download } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 
 interface ConsentViewerProps {
   consentId?: string;
-  consentHtml?: string; // direct HTML if passed
+  consentHtml?: string;
+  patientId?: string;  // look up consent by patient_id
   patientName: string;
   onClose: () => void;
 }
 
-export default function ConsentViewer({ consentId, consentHtml, patientName, onClose }: ConsentViewerProps) {
+export default function ConsentViewer({ consentId, consentHtml, patientId, patientName, onClose }: ConsentViewerProps) {
   const [html, setHtml] = useState<string | null>(consentHtml || null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    if (consentHtml) {
-      setHtml(consentHtml);
-      return;
-    }
+    if (consentHtml) { setHtml(consentHtml); return; }
+    if (consentId) { loadConsentById(consentId); return; }
+    if (patientId) { loadConsentByPatient(patientId); return; }
+  }, [consentId, consentHtml, patientId]);
 
-    if (consentId) {
-      loadConsent();
-    }
-  }, [consentId, consentHtml]);
-
-  const loadConsent = async () => {
-    if (!consentId) return;
-    
+  const loadConsentByPatient = async (pid: string) => {
     setLoading(true);
     setError(null);
-    
     try {
-      // Try to load from Supabase Storage first
-      // const { data, error: storageError } = await supabase.storage
-      //   .from('consents')
-      //   .download(`${consentId}.html`);
-      // 
-      // if (storageError) throw storageError;
-      // const htmlText = await data.text();
-      // setHtml(htmlText);
-      
-      // Fallback: Load from localStorage
+      // Get most recent consent record for this patient
+      const { data, error: dbError } = await supabase
+        .from('consent_records')
+        .select('id, storage_path, consent_html')
+        .eq('patient_id', pid)
+        .order('signed_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (dbError || !data) throw new Error('No consent record found for this patient.');
+
+      // Try storage first, then inline, then localStorage
+      if (data.storage_path) {
+        const { data: blob } = await supabase.storage.from('consents').download(data.storage_path);
+        if (blob) { setHtml(await blob.text()); return; }
+      }
+      if (data.consent_html) { setHtml(data.consent_html); return; }
+      const local = localStorage.getItem(`consent_${data.id}`);
+      if (local) { setHtml(local); return; }
+      throw new Error('Consent document not found in storage or database.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load consent.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadConsentById = async (cid: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: blob } = await supabase.storage.from('consents').download(`${cid}.html`);
+      if (blob) { setHtml(await blob.text()); return; }
+      const local = localStorage.getItem(`consent_${cid}`);
+      if (local) { setHtml(local); return; }
+      throw new Error('Consent not found.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load consent.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Legacy method kept for compat
+  const loadConsent = async () => {
+    if (!consentId) return;
+    setLoading(true);
+    setError(null);
+    try {
       const storedHtml = localStorage.getItem(`consent_${consentId}`);
       
       if (!storedHtml) {

@@ -1,406 +1,969 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Save, Calendar, User, Zap, AlertTriangle, Sun, Gauge, Thermometer } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import {
+  Save, User, Zap, Sun, Loader2, CheckCircle2, ClipboardCheck,
+  Activity, MessageSquare, ChevronDown, Shield, Square, Circle, FileText, X, AlertTriangle,
+} from 'lucide-react';
 
-export default function SessionLogger() {
-  const [patient] = useState({ name: 'Sarah Smith', skinType: 'III', package: 'The Essential Duo' });
-  const [session, setSession] = useState(4);
-  const totalSessions = 8;
-  const [skinCheck, setSkinCheck] = useState({ rechecked: false, type: 'III', sunExposure: false });
-  const [exposedAreas, setExposedAreas] = useState<string[]>([]);
-  const [treatmentType, setTreatmentType] = useState('hair_removal');
-  const [areaTreated, setAreaTreated] = useState('Underarms');
+// ─── Constants
 
-  // Mock previous session data (This would come from DB)
-  const previousSession = {
-    shotsAlex: 1250,
-    shotsYag: 450
+const MEDICAL_LABELS: Record<string, string> = {
+  selfTanner: 'Self tanner in last 7 days',
+  sunExposure: 'Prolonged sun exposure (last 4 weeks)',
+  accutane: 'Accutane in last 6 months',
+  pregnant: 'Currently pregnant or breastfeeding',
+  recentBirth: 'Given birth in last 12 months',
+  photosensitive: 'Photosensitive meds / retinol / retin-a',
+  antibiotics: 'Currently taking antibiotics',
+  herpesSimplex: 'History of Herpes Simplex',
+  keloids: 'History of keloid scarring',
+  tattoos: 'Tattoos/permanent makeup in treatment area',
+  cancer: 'History of skin cancer',
+};
+// ───────────────────────────────────────────────────────────────
+
+const PICO_PROBES = ['Universal (Silver)', 'Honeycomb (755nm)', 'Carbon Peeling'];
+const PICO_WAVELENGTHS = ['1064nm', '755nm', '532nm'];
+const PICO_MODES = ['Standard', 'Dual Pulse/PTP', 'Multipulse', 'Long Pulse'];
+
+const BODY_AREAS = [
+  'Underarms', 'Bikini/Brazilian', 'Full Legs', 'Back',
+  'Face', 'Neck', 'Arms', 'Chest', 'Tattoo', 'Melasma/Pigment',
+] as const;
+
+const SKIN_TYPES = ['I', 'II', 'III', 'IV', 'V', 'VI'] as const;
+
+const CLINICAL_ENDPOINTS = [
+  'Mild Erythema',
+  'PFE (Edema)',
+  'None / Poor Response',
+] as const;
+
+const WAVELENGTH_OPTIONS = ['755nm (Alexandrite)', '1064nm (Nd:YAG)', 'Blend'] as const;
+
+const COOLING_LEVELS = ['Off', 'Low', 'Medium', 'High', 'Max'] as const;
+
+// ─── Types// ───────────────────────────────────────────────────────────────────
+
+interface TreatmentParams {
+  machineUsed: 'Splendor X' | 'PicoKing';
+  picoProbe: string;
+  picoWavelength: string;
+  picoMode: string;
+  picoFreq: string;
+  wavelength: string;
+  spotShape: 'Square' | 'Round';
+  spotSize: string;
+  fluenceTotal: string;
+  fluenceAlex: string;
+  pulseWidthAlex: string;
+  pulseWidthYag: string;
+  repRate: string;
+  coolingLevel: string;
+  numPulses: string;
+}
+
+interface PreChecklist {
+  hairShaved: boolean;
+  areaCleaned: boolean;
+  consentSigned: boolean;
+}
+
+// ─── Shared Sub-Components (MUST be outside main component to avoid remount) ──
+
+const SectionCard = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
+  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="flex items-center gap-2 px-5 py-3 bg-slate-50 border-b border-slate-200">
+      {icon}
+      <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">{title}</h3>
+    </div>
+    <div className="p-5">{children}</div>
+  </div>
+);
+
+const Label = ({ children }: { children: React.ReactNode }) => (
+  <label className="text-sm font-semibold text-slate-700">{children}</label>
+);
+
+const NumberInput = ({ value, onChange, placeholder, className = '' }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; className?: string;
+}) => (
+  <input
+    type="number"
+    step="any"
+    value={value}
+    onChange={e => onChange(e.target.value)}
+    placeholder={placeholder}
+    className={`w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 font-mono text-sm
+      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${className}`}
+  />
+);
+
+// ─── Component// ───────────────────────────────────────────────────────────────
+
+export default function SessionLogger({ patientId, onSaveSuccess }: { patientId: string | null, onSaveSuccess?: () => void }) {
+  const [patient, setPatient] = useState<any>(null);
+  const [plan, setPlan] = useState<any>(null);
+  const [packageName, setPackageName] = useState<string>('Standard Package');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showIntakeModal, setShowIntakeModal] = useState(false);
+
+  // Session
+  const [sessionNum, setSessionNum] = useState(1);
+  const [totalSessionsEdit, setTotalSessionsEdit] = useState(8);
+
+  // Pre-treatment checklist
+  const [preChecklist, setPreChecklist] = useState<PreChecklist>({
+    hairShaved: false,
+    areaCleaned: false,
+    consentSigned: false,
+  });
+
+  // Sun exposure
+  const [sunExposure, setSunExposure] = useState(false);
+  const [sunExposedAreas, setSunExposedAreas] = useState<string[]>([]);
+
+  const [skinTypeAtSession, setSkinTypeAtSession] = useState<string>('');
+
+  // Treatment parameters
+  const [params, setParams] = useState<TreatmentParams>({
+    machineUsed: 'Splendor X',
+    picoProbe: 'Universal (Silver)',
+    picoWavelength: '1064nm',
+    picoMode: 'Standard',
+    picoFreq: '',
+    wavelength: '755nm (Alexandrite)',
+    spotShape: 'Square',
+    spotSize: '',
+    fluenceTotal: '',
+    fluenceAlex: '',
+    pulseWidthAlex: '',
+    pulseWidthYag: '',
+    repRate: '',
+    coolingLevel: 'Medium',
+    numPulses: '',
+  });
+
+  // Areas treated
+  const [areasTreated, setAreasTreated] = useState<string[]>([]);
+  const [otherArea, setOtherArea] = useState('');
+  const [showOtherArea, setShowOtherArea] = useState(false);
+
+  // Clinical endpoint
+  const [clinicalEndpoint, setClinicalEndpoint] = useState('');
+
+  // Notes
+  const [notes, setNotes] = useState('');
+  const [techNotes, setTechNotes] = useState('');
+  const [notesHistory, setNotesHistory] = useState<Array<{session_number: number; treatment_date: string; notes: string | null; tech_notes: string | null}>>([]);
+  const [showNotesHistory, setShowNotesHistory] = useState(false);
+
+  // ─── Data Fetching ──────────────────────────────────────────────────────
+
+  const fetchData = useCallback(async () => {
+    if (!patientId) { setLoading(false); return; }
+    setLoading(true);
+    try {
+      // Fetch patient
+      const { data: pt } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('id', patientId)
+        .single();
+      setPatient(pt);
+      setSkinTypeAtSession(pt?.baseline_skin_type || pt?.skin_type || '');
+
+      // Fetch active plan
+      const { data: plans } = await supabase
+        .from('treatment_plans')
+        .select('*')
+        .eq('patient_id', patientId)
+        .eq('status', 'active');
+      const activePlan = plans?.[0] ?? null;
+      setPlan(activePlan);
+      if (activePlan) setTotalSessionsEdit(activePlan.total_sessions || 8);
+      
+      if (activePlan?.package_name) {
+        setPackageName(activePlan.package_name);
+      }
+
+      // Fetch most recent treatment for pre-population
+      if (activePlan) {
+        const { data: treatments } = await supabase
+          .from('treatments')
+          .select('*')
+          .eq('plan_id', activePlan.id)
+          .order('session_number', { ascending: false })
+          .limit(1);
+
+        const prev = treatments?.[0];
+        if (prev) {
+          setSessionNum(prev.session_number + 1);
+          setTechNotes(prev.tech_notes || '');
+
+        // Fetch notes history
+        const { data: historyData } = await supabase
+          .from('treatments')
+          .select('session_number, treatment_date, notes, tech_notes')
+          .eq('plan_id', activePlan.id)
+          .order('session_number', { ascending: false });
+        if (historyData) setNotesHistory(historyData.filter(h => h.notes || h.tech_notes));
+          // Pre-populate parameters from previous session
+          const prevAreas = prev.areas_treated as any;
+          setParams(p => ({
+            ...p,
+            spotSize: prev.spot_size ?? '',
+            fluenceTotal: prev.fluence_jcm2?.toString() ?? '',
+            pulseWidthAlex: prev.pulse_width_ms?.toString() ?? '',
+            pulseWidthYag: prev.pulse_width_ms?.toString() ?? '',
+            coolingLevel: prev.cooling_setting ?? 'Medium',
+            machineUsed: prev.machine_used ?? 'Splendor X',
+            picoProbe: prev.pico_probe ?? 'Universal (Silver)',
+            picoWavelength: prev.pico_wavelength ?? '1064nm',
+            picoMode: prev.pico_mode ?? 'Standard',
+            picoFreq: prev.pico_frequency_hz?.toString() ?? '',
+            // Preserve wavelength/shape from areas_treated jsonb if stored
+            ...(prevAreas?.params ?? {}),
+          }));
+          if (Array.isArray(prevAreas?.areas)) {
+            setAreasTreated(prevAreas.areas);
+          } else if (Array.isArray(prevAreas)) {
+            setAreasTreated(prevAreas);
+          }
+        } else {
+          setSessionNum(1);
+          setTechNotes('');
+        }
+      }
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [patientId]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ─── Handlers ────────────────────────────────────────────────────────────
+
+  const toggleArea = (area: string, list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>) => {
+    setList(prev => prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]);
   };
 
-  // Logic: Is the treatment safe?
-  const isTreatmentBlocked = skinCheck.sunExposure && exposedAreas.includes(areaTreated);
+  const updateParam = (key: keyof TreatmentParams, value: string) => {
+    setParams(p => ({ ...p, [key]: value }));
+  };
 
-  const handleSave = () => {
-    if (!skinCheck.rechecked) {
-      alert("Please confirm the Fitzpatrick Skin Type before saving.");
+  const handleSave = async () => {
+    if (!patientId || !patient) return;
+    if (showOtherArea && !otherArea.trim()) {
+      setError("Please specify the 'Other' area.");
       return;
     }
-    if (isTreatmentBlocked) {
-      alert(`WARNING: Recent sun exposure reported on ${areaTreated}. Treatment postponed.`);
+    if (!skinTypeAtSession) {
+      setError("Please select the patient's Skin Type Today.");
       return;
     }
-    alert("Session Saved! Next Appointment: April 12, 2026");
-  };
+    setSaving(true);
+    setError(null);
 
-  const toggleExposedArea = (area: string) => {
-    if (exposedAreas.includes(area)) {
-      setExposedAreas(exposedAreas.filter(a => a !== area));
-    } else {
-      setExposedAreas([...exposedAreas, area]);
+    try {
+      let activePlan = plan;
+
+      // Create plan if none exists
+      if (!activePlan) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: newPlan, error: planErr } = await supabase
+          .from('treatment_plans')
+          .insert({
+            patient_id: patientId,
+            package_name: packageName || 'Standard Package',
+            total_sessions: totalSessionsEdit,
+            status: 'active',
+            assigned_tech_id: user?.id,
+          })
+          .select()
+          .single();
+        if (planErr) throw planErr;
+        activePlan = newPlan;
+        setPlan(newPlan);
+      } else if (activePlan.package_name !== packageName) {
+        // Update plan name if changed
+        const { error: planUpdateErr } = await supabase
+          .from('treatment_plans')
+          .update({ package_name: packageName || 'Standard Package', total_sessions: totalSessionsEdit })
+          .eq('id', activePlan.id);
+        if (planUpdateErr) throw planUpdateErr;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const allAreas = [...areasTreated];
+      if (showOtherArea && otherArea.trim()) allAreas.push(otherArea.trim());
+
+      const { error: insertErr } = await supabase.from('treatments').insert({
+        patient_id: patientId,
+        plan_id: activePlan.id,
+        tech_user_id: user?.id,
+        session_number: sessionNum,
+        skin_type_at_session: skinTypeAtSession || null,
+        sun_exposure_check: sunExposure,
+        sun_exposed_areas: sunExposure ? sunExposedAreas : null,
+        areas_treated: {
+          areas: allAreas,
+          params: {
+            wavelength: params.wavelength,
+            spotShape: params.spotShape,
+            repRate: params.repRate,
+            numPulses: params.numPulses,
+          },
+        },
+        spot_size: params.spotSize || null,
+        fluence_jcm2: params.fluenceTotal ? parseFloat(params.fluenceTotal) : null,
+        pulse_width_ms: params.pulseWidthAlex ? parseFloat(params.pulseWidthAlex) : null,
+        cooling_setting: params.coolingLevel,
+        machine_used: params.machineUsed,
+        pico_probe: params.machineUsed === 'PicoKing' ? params.picoProbe : null,
+        pico_wavelength: params.machineUsed === 'PicoKing' ? params.picoWavelength : null,
+        pico_mode: params.machineUsed === 'PicoKing' ? params.picoMode : null,
+        pico_frequency_hz: params.machineUsed === 'PicoKing' && params.picoFreq ? parseFloat(params.picoFreq) : null,
+        overlap_percent: null,
+        
+        shots_fired_alex: params.wavelength.includes('Alexandrite') || params.wavelength === 'Blend' ? (params.numPulses ? parseInt(params.numPulses) : null) : null,
+        shots_fired_yag: params.wavelength.includes('Nd:YAG') || params.wavelength === 'Blend' ? (params.numPulses ? parseInt(params.numPulses) : null) : null,
+        tech_notes: techNotes || null,
+        clinical_endpoint: clinicalEndpoint || null,
+        notes: notes || null,
+      });
+
+      if (insertErr) throw insertErr;
+      setSuccess(true);
+      setTimeout(() => {
+        setSuccess(false);
+        if (onSaveSuccess) onSaveSuccess();
+      }, 2000);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Get machine name based on treatment type
-  const getMachineName = () => {
-    return treatmentType === 'tattoo_removal' ? 'PicoKing EL950' : 'Splendor X';
-  };
+  // SectionCard, Label, NumberInput all moved outside component
+
+  // ─── Loading / Empty States ─────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+      </div>
+    );
+  }
+
+  if (!patientId || !patient) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+        <User className="w-12 h-12 mb-2" />
+        <p className="text-lg">Select a patient to begin</p>
+      </div>
+    );
+  }
+
+  const totalSessions = plan?.total_sessions ?? 8;
+  const dob = patient.dob
+    ? new Date(patient.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '—';
+
+  // ─── Main Render ────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-6 pb-20">
-      
-      {/* Header Card */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <div className="flex justify-between items-start">
+    <div className="max-w-3xl mx-auto space-y-5 pb-12">
+
+      {/* ── Section 1: Patient Header ─────────────────────────────────── */}
+      <div className="bg-slate-900 rounded-xl p-5 text-white shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <User className="w-6 h-6 text-blue-600" />
-              {patient.name}
-            </h1>
-            <p className="text-slate-500 mt-1">Baseline: Type <span className="font-semibold text-slate-800">{patient.skinType}</span></p>
+            <h2 className="text-xl font-bold tracking-tight">
+              {patient.first_name} {patient.last_name}
+            </h2>
+            <p className="text-slate-300 text-sm mt-0.5">DOB: {dob}</p>
           </div>
-          <div className="text-right">
-            <span className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold uppercase tracking-wide">
-              {patient.package}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center bg-purple-500/20 text-purple-300 text-xs font-bold px-2 py-1 rounded-full border border-purple-500/30">
+              <input 
+                type="text" 
+                value={packageName} 
+                onChange={(e) => setPackageName(e.target.value)}
+                placeholder="Package Name"
+                className="bg-purple-900/60 text-white text-center rounded font-semibold border border-purple-400/30 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400 py-0.5 mx-1"
+                style={{ width: `${Math.max(12, packageName.length + 2)}ch` }}
+              />
+            </span>
+            <button 
+              onClick={() => setShowIntakeModal(true)}
+              className="inline-flex items-center gap-1.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 text-xs font-bold px-3 py-1.5 rounded-full border border-indigo-500/30 transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              View Intake
+            </button>
+            <a 
+              href={`/patients/${patientId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 text-xs font-bold px-3 py-1.5 rounded-full border border-teal-500/30 transition-colors no-underline"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              View Chart
+            </a>
+            <span className="inline-flex items-center bg-blue-500/20 text-blue-300 text-xs font-bold px-2 py-1 rounded-full border border-blue-500/30">
+              <span className="px-1">Session</span>
+              <input 
+                type="number" 
+                min="1"
+                value={sessionNum || ''} 
+                onChange={(e) => setSessionNum(parseInt(e.target.value) || 1)}
+                className="w-10 bg-blue-900/60 text-white text-center rounded font-mono border border-blue-400/30 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 py-0.5 mx-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+              <span className="px-1">/ </span>
+              <input 
+                type="number" 
+                min="1"
+                value={totalSessionsEdit || ''} 
+                onChange={(e) => setTotalSessionsEdit(parseInt(e.target.value) || 1)}
+                className="w-10 bg-blue-900/60 text-white text-center rounded font-mono border border-blue-400/30 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 py-0.5 mr-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
             </span>
           </div>
         </div>
-
-        {/* Progress Bar */}
-        <div className="mt-6">
-          <div className="flex justify-between text-sm font-medium text-slate-600 mb-2">
-            <span>Session {session} of {totalSessions}</span>
-            <span>{Math.round((session / totalSessions) * 100)}% Complete</span>
-          </div>
-          <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-            <div 
-              className="bg-blue-600 h-3 rounded-full transition-all duration-500" 
-              style={{ width: `${(session / totalSessions) * 100}%` }}
-            ></div>
-          </div>
-        </div>
       </div>
 
-      {/* Safety Check: Mandatory Re-Type & Sun Exposure */}
-      <div className={`bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col gap-3 ${isTreatmentBlocked ? 'bg-red-50 border-red-200' : ''}`}>
-        <div className={`flex items-center gap-2 font-semibold ${isTreatmentBlocked ? 'text-red-700' : 'text-amber-800'}`}>
-          <AlertTriangle className="w-5 h-5" />
-          Mandatory Safety Check
-        </div>
-        
+      {/* ── Section 2: Pre-Treatment Checklist ────────────────────────── */}
+      <SectionCard title="Pre-Treatment Checklist" icon={<ClipboardCheck className="w-4 h-4 text-slate-500" />}>
         <div className="space-y-3">
-          {/* Sun Exposure Question */}
-          <div className="bg-white p-3 rounded-lg border border-amber-100 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                <Sun className="w-4 h-4 text-orange-500" />
-                Recent sun exposure / tanning?
-              </div>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-1 cursor-pointer">
-                  <input 
-                    type="radio" name="sun" 
-                    checked={skinCheck.sunExposure === true}
-                    onChange={() => setSkinCheck({ ...skinCheck, sunExposure: true })}
-                    className="w-4 h-4 text-red-600" 
-                  />
-                  <span className="text-sm font-bold text-red-600">YES</span>
-                </label>
-                <label className="flex items-center gap-1 cursor-pointer">
-                  <input 
-                    type="radio" name="sun" 
-                    checked={skinCheck.sunExposure === false}
-                    onChange={() => {
-                      setSkinCheck({ ...skinCheck, sunExposure: false });
-                      setExposedAreas([]); // Clear areas if NO sun
-                    }}
-                    className="w-4 h-4 text-green-600" 
-                  />
-                  <span className="text-sm font-bold text-green-600">NO</span>
-                </label>
-              </div>
-            </div>
+          {([
+            ['hairShaved', 'Hair closely shaved?'],
+            ['areaCleaned', 'Treatment area cleaned and dry?'],
+            ['consentSigned', 'Consent form signed?'],
+          ] as const).map(([key, label]) => (
+            <label key={key} className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={preChecklist[key]}
+                onChange={() => setPreChecklist(p => ({ ...p, [key]: !p[key] }))}
+                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-slate-700">{label}</span>
+            </label>
+          ))}
 
-            {/* If YES, Show Area Checklist */}
-            {skinCheck.sunExposure && (
-              <div className="mt-2 pt-2 border-t border-slate-100">
-                <p className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Select Exposed Areas:</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {['Face', 'Neck', 'Arms', 'Underarms', 'Legs', 'Back', 'Chest', 'Bikini'].map(area => (
-                    <label key={area} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
-                      <input 
-                        type="checkbox" 
-                        checked={exposedAreas.includes(area)}
-                        onChange={() => toggleExposedArea(area)}
-                        className="w-4 h-4 text-red-500 rounded border-slate-300"
-                      />
-                      <span className="text-sm text-slate-700">{area}</span>
-                    </label>
-                  ))}
-                </div>
+          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3">
+            <Label>Skin Type Today (Fitzpatrick):</Label>
+            <select
+              value={skinTypeAtSession}
+              onChange={e => setSkinTypeAtSession(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 bg-white"
+            >
+              <option value="" disabled>Select Type</option>
+              {SKIN_TYPES.map(type => (
+                <option key={type} value={type}>Type {type}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="border-t border-slate-100 pt-3 mt-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={sunExposure}
+                onChange={() => setSunExposure(!sunExposure)}
+                className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500"
+              />
+              <span className="text-sm font-semibold text-amber-700 flex items-center gap-1.5">
+                <Sun className="w-4 h-4" /> Recent Sun Exposure?
+              </span>
+            </label>
+            {sunExposure && (
+              <div className="mt-3 ml-7 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {BODY_AREAS.map(area => (
+                  <label key={area} className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sunExposedAreas.includes(area)}
+                      onChange={() => toggleArea(area, sunExposedAreas, setSunExposedAreas)}
+                      className="w-3.5 h-3.5 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+                    />
+                    {area}
+                  </label>
+                ))}
               </div>
             )}
           </div>
-
-          {/* Skin Type Check */}
-          <div className="flex items-center gap-4">
-            <select 
-              className="p-2 border border-amber-300 rounded bg-white text-sm"
-              value={skinCheck.type}
-              onChange={(e) => setSkinCheck({ ...skinCheck, type: e.target.value })}
-            >
-              <option value="I">Type I</option>
-              <option value="II">Type II</option>
-              <option value="III">Type III</option>
-              <option value="IV">Type IV</option>
-              <option value="V">Type V</option>
-              <option value="VI">Type VI</option>
-            </select>
-            
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input 
-                type="checkbox" 
-                checked={skinCheck.rechecked}
-                onChange={(e) => setSkinCheck({ ...skinCheck, rechecked: e.target.checked })}
-                className="w-4 h-4 text-amber-600 rounded" 
-              />
-              <span className="text-sm font-medium text-amber-900">I have examined the skin today.</span>
-            </label>
-          </div>
         </div>
+      </SectionCard>
 
-        {isTreatmentBlocked && (
-          <div className="text-red-600 text-sm font-bold flex items-center gap-2 mt-2 bg-red-100 p-2 rounded animate-pulse">
-            🛑 STOP: Sun exposure detected on {areaTreated}. Treatment Blocked.
-          </div>
-        )}
-      </div>
+      {/* ── Section 3: Treatment Parameters ───────────────────────────── */}
+      <SectionCard title="Treatment Parameters" icon={<Zap className="w-4 h-4 text-slate-500" />}>
+        <div className="space-y-4">
 
-      {/* Treatment Form - Locked if Blocked or Unchecked */}
-      <div className={`bg-white rounded-xl shadow-sm border border-slate-200 p-6 transition-opacity ${(!skinCheck.rechecked || isTreatmentBlocked) ? 'opacity-50 pointer-events-none' : ''}`}>
-        <h2 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-          <Zap className="w-5 h-5 text-amber-500" />
-          Treatment Settings ({getMachineName()})
-        </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Treatment Type Selector */}
-          <div className="col-span-1 md:col-span-2 space-y-2">
-            <label className="text-sm font-medium text-slate-700">Treatment Type</label>
-            <select 
-              className="w-full p-2 border border-slate-300 rounded-md bg-white font-semibold"
-              value={treatmentType}
-              onChange={(e) => setTreatmentType(e.target.value)}
-            >
-              <option value="hair_removal">Laser Hair Removal</option>
-              <option value="tattoo_removal">Laser Tattoo Removal</option>
-              <option value="carbon_peel">Carbon Peel</option>
-              <option value="pico_pigment">Pico Pigment</option>
-              <option value="pico_skin_tightening">Pico Skin Tightening</option>
-              <option value="other">Other</option>
-            </select>
+          {/* Machine Selection */}
+          <div>
+            <Label>Machine Used</Label>
+            <div className="mt-1.5 flex gap-2 p-1 bg-slate-100 rounded-lg max-w-fit">
+              {(['Splendor X', 'PicoKing'] as const).map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => updateParam('machineUsed', m)}
+                  className={`px-6 py-2 rounded-md text-sm font-semibold transition-all ${
+                    params.machineUsed === m
+                      ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Area Treated - changes based on treatment type */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Area Treated</label>
-            <select 
-              className="w-full p-2 border border-slate-300 rounded-md bg-white"
-              value={areaTreated}
-              onChange={(e) => setAreaTreated(e.target.value)}
-            >
-              {treatmentType === 'tattoo_removal' ? (
-                <>
-                  <option value="Arm">Arm</option>
-                  <option value="Wrist">Wrist</option>
-                  <option value="Ankle">Ankle</option>
-                  <option value="Neck">Neck</option>
-                  <option value="Back">Back</option>
-                  <option value="Chest">Chest</option>
-                  <option value="Shoulder">Shoulder</option>
-                  <option value="Leg">Leg</option>
-                  <option value="Other">Other</option>
-                </>
-              ) : (
-                <>
-                  <option value="Underarms">Underarms</option>
-                  <option value="Bikini">Bikini / Brazilian</option>
-                  <option value="Legs">Full Legs</option>
-                  <option value="Back">Back</option>
-                  <option value="Face">Face</option>
-                </>
-              )}
-            </select>
-          </div>
-
-          {/* Spot Size - changes based on treatment type */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-700">Spot Size</label>
-            <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
-              {treatmentType === 'tattoo_removal' ? (
-                <>
-                  <option>2mm</option>
-                  <option>4mm</option>
-                  <option>6mm</option>
-                  <option>8mm</option>
-                  <option>10mm</option>
-                </>
-              ) : (
-                <>
-                  <option>18mm (Square)</option>
-                  <option>20mm (Square)</option>
-                  <option>24mm (Square)</option>
-                </>
-              )}
-            </select>
-          </div>
-
-          {/* Conditional fields based on treatment type */}
-          {treatmentType === 'tattoo_removal' ? (
+          {params.machineUsed === 'Splendor X' ? (
             <>
-              {/* Wavelength Used */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Wavelength Used</label>
-                <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
-                  <option>532nm (Green/Red ink)</option>
-                  <option>755nm (Blue/Black ink)</option>
-                  <option>1064nm (Black/Dark ink)</option>
-                  <option>Multi</option>
-                </select>
-              </div>
+              {/* Wavelength */}
+          <div>
+            <Label>Wavelength</Label>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {WAVELENGTH_OPTIONS.map(w => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => updateParam('wavelength', w)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all ${
+                    params.wavelength === w
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'
+                  }`}
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
+          </div>
 
-              {/* Energy (mJ) */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Energy (mJ)</label>
-                <input 
-                  type="number" 
-                  className="w-full p-2 border border-slate-300 rounded-md" 
-                  placeholder="100-900"
-                  min="100"
-                  max="900"
-                />
-              </div>
+          {/* Spot Shape */}
+          <div>
+            <Label>Spot Shape</Label>
+            <div className="mt-1.5 flex gap-3">
+              {(['Square', 'Round'] as const).map(shape => (
+                <label key={shape} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="spotShape"
+                    checked={params.spotShape === shape}
+                    onChange={() => updateParam('spotShape', shape)}
+                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="flex items-center gap-1.5 text-sm text-slate-700">
+                    {shape === 'Square' ? <Square className="w-3.5 h-3.5" /> : <Circle className="w-3.5 h-3.5" />}
+                    {shape}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
 
-              {/* Pulse Mode */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Pulse Mode</label>
-                <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
-                  <option>Single Pulse</option>
-                  <option>PTP (Dual Pulse)</option>
-                </select>
-              </div>
+          {/* Spot Size + Rep Rate */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Spot Size (mm)</Label>
+              <NumberInput value={params.spotSize} onChange={v => updateParam('spotSize', v)} placeholder="e.g. 18" />
+            </div>
+            <div>
+              <Label>Rep Rate (Hz)</Label>
+              <NumberInput value={params.repRate} onChange={v => updateParam('repRate', v)} placeholder="e.g. 2" />
+            </div>
+          </div>
 
-              {/* Ink Response (Clinical Endpoint) */}
-              <div className="col-span-1 md:col-span-2 space-y-2">
-                <label className="text-sm font-bold text-slate-800">Ink Response (Clinical Endpoint)</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer bg-green-50 px-3 py-2 rounded border border-green-200 hover:border-green-400">
-                    <input type="radio" name="inkResponse" className="w-4 h-4 text-green-600" />
-                    <span className="text-sm text-slate-700">✅ Immediate Whitening (Frosting)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-blue-300">
-                    <input type="radio" name="inkResponse" className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm text-slate-700">Mild Erythema</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-red-300">
-                    <input type="radio" name="inkResponse" className="w-4 h-4 text-red-600" />
-                    <span className="text-sm text-slate-700">No Response</span>
-                  </label>
+          {/* Fluence & Pulse Duration Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label>Fluence Total (J/cm²)</Label>
+              <div className="mt-1.5">
+                  <NumberInput value={params.fluenceTotal} onChange={v => updateParam('fluenceTotal', v)} placeholder="J/cm²" />
+              </div>
+            </div>
+            
+            <div>
+              <Label>Pulse Duration PD (ms)</Label>
+              <div className="grid grid-cols-2 gap-4 mt-1.5">
+                <div>
+                  <span className="text-xs text-slate-500">755nm Alex</span>
+                  <NumberInput value={params.pulseWidthAlex} onChange={v => updateParam('pulseWidthAlex', v)} placeholder="ms" />
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500">1064nm Nd:YAG</span>
+                  <NumberInput value={params.pulseWidthYag} onChange={v => updateParam('pulseWidthYag', v)} placeholder="ms" />
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Cooling + Pulses */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Cooling Level</Label>
+              <div className="relative mt-1.5">
+                <select
+                  value={params.coolingLevel}
+                  onChange={e => updateParam('coolingLevel', e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm appearance-none
+                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white pr-8"
+                >
+                  {COOLING_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+                <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+            <div>
+              <Label>Shots Fired</Label>
+              <NumberInput value={params.numPulses} onChange={v => updateParam('numPulses', v)} placeholder="Total Shots" />
+            </div>
+          </div>
             </>
           ) : (
             <>
-              {/* Hair Removal Settings */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Fluence (J/cm²)</label>
-                <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="14" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Pulse Width (ms)</label>
-                <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="20" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                  <Gauge className="w-4 h-4 text-slate-400" />
-                  Overlap (%)
-                </label>
-                <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
-                  <option>10%</option>
-                  <option>15% (Recommended)</option>
-                  <option>20%</option>
-                  <option>25%</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                  <Thermometer className="w-4 h-4 text-slate-400" />
-                  Cooling (Zimmer)
-                </label>
-                <select className="w-full p-2 border border-slate-300 rounded-md bg-white">
-                  <option>High (Level 5-6)</option>
-                  <option>Medium (Level 3-4)</option>
-                  <option>Low (Level 1-2)</option>
-                </select>
-              </div>
-
-              {/* Shots Fired Section - Only for hair removal */}
-              <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Alex (755nm)</label>
-                  <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
-                  <p className="text-xs text-slate-400">Prev: {previousSession.shotsAlex}</p>
+              {/* PicoKing UI */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label>Probe</Label>
+                  <div className="relative mt-1.5">
+                    <select
+                      value={params.picoProbe}
+                      onChange={e => updateParam('picoProbe', e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm appearance-none focus:ring-2 focus:ring-blue-500 bg-white pr-8"
+                    >
+                      {PICO_PROBES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Nd:YAG (1064nm)</label>
-                  <input type="number" className="w-full p-2 border border-slate-300 rounded-md" placeholder="0" />
-                  <p className="text-xs text-slate-400">Prev: {previousSession.shotsYag}</p>
+                <div>
+                  <Label>Wavelength</Label>
+                  <div className="relative mt-1.5">
+                    <select
+                      value={params.picoWavelength}
+                      onChange={e => updateParam('picoWavelength', e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm appearance-none focus:ring-2 focus:ring-blue-500 bg-white pr-8"
+                    >
+                      {PICO_WAVELENGTHS.map(w => <option key={w} value={w}>{w}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
                 </div>
-              </div>
-
-              {/* Clinical Endpoint - Only for hair removal */}
-              <div className="col-span-1 md:col-span-2 space-y-3">
-                <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                  Clinical Endpoint Reached?
-                  <span className="text-xs font-normal text-slate-500">(Must observe PFE/Erythema)</span>
-                </label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-blue-300">
-                    <input type="radio" name="endpoint" className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm text-slate-700">Mild Erythema</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-blue-300">
-                    <input type="radio" name="endpoint" className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm text-slate-700">PFE (Edema)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200 hover:border-red-300">
-                    <input type="radio" name="endpoint" className="w-4 h-4 text-red-600" />
-                    <span className="text-sm text-slate-700">None / Poor Response</span>
-                  </label>
+                <div>
+                  <Label>Mode</Label>
+                  <div className="relative mt-1.5">
+                    <select
+                      value={params.picoMode}
+                      onChange={e => updateParam('picoMode', e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm appearance-none focus:ring-2 focus:ring-blue-500 bg-white pr-8"
+                    >
+                      {PICO_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Frequency (Hz)</Label>
+                  <NumberInput value={params.picoFreq} onChange={v => updateParam('picoFreq', v)} placeholder="e.g. 5" />
+                </div>
+                <div>
+                  <Label>Spot Size (mm)</Label>
+                  <NumberInput value={params.spotSize} onChange={v => updateParam('spotSize', v)} placeholder="2-10" />
+                </div>
+                <div>
+                  <Label>Fluence (J/cm²)</Label>
+                  <NumberInput value={params.fluenceAlex} onChange={v => updateParam('fluenceAlex', v)} placeholder="Warning > 12" />
+                </div>
+                <div>
+                  <Label>Number of Pulses (Total)</Label>
+                  <NumberInput value={params.numPulses} onChange={v => updateParam('numPulses', v)} placeholder="Total" />
                 </div>
               </div>
             </>
           )}
+
         </div>
+      </SectionCard>
 
-        <div className="mt-6 space-y-2">
-          <label className="text-sm font-medium text-slate-700">Notes</label>
-          <textarea className="w-full p-2 border border-slate-300 rounded-md h-24" placeholder="Patient reported mild sensitivity on left side..."></textarea>
+      {/* ── Section 4: Areas Treated ──────────────────────────────────── */}
+      <SectionCard title="Areas Treated" icon={<Activity className="w-4 h-4 text-slate-500" />}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {BODY_AREAS.map(area => (
+            <label key={area} className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-all text-sm ${
+              areasTreated.includes(area)
+                ? 'bg-blue-50 border-blue-300 text-blue-800 font-medium'
+                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+            }`}>
+              <input
+                type="checkbox"
+                checked={areasTreated.includes(area)}
+                onChange={() => toggleArea(area, areasTreated, setAreasTreated)}
+                className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              {area}
+            </label>
+          ))}
         </div>
+        <div className="mt-4 pt-3 border-t border-slate-100">
+          <label className="flex items-center gap-2 cursor-pointer mb-2">
+            <input
+              type="checkbox"
+              checked={showOtherArea}
+              onChange={() => setShowOtherArea(!showOtherArea)}
+              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm font-semibold text-slate-700">Other Area</span>
+          </label>
+          {showOtherArea && (
+            <input
+              type="text"
+              value={otherArea}
+              onChange={e => setOtherArea(e.target.value)}
+              placeholder="Specify other area..."
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          )}
+        </div>
+      </SectionCard>
 
-        <button 
-          onClick={handleSave}
-          disabled={!skinCheck.rechecked}
-          className="w-full mt-6 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-semibold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
-        >
-          <Save className="w-5 h-5" />
-          Log Session & Schedule Next
-        </button>
-      </div>
+      {/* ── Section 5: Clinical Endpoint ──────────────────────────────── */}
+      <SectionCard title="Clinical Endpoint / Reaction" icon={<CheckCircle2 className="w-4 h-4 text-slate-500" />}>
+        <div className="flex flex-col sm:flex-row gap-3">
+          {CLINICAL_ENDPOINTS.map(ep => (
+            <label key={ep} className={`flex items-center gap-2.5 px-4 py-2.5 rounded-lg border cursor-pointer transition-all text-sm ${
+              clinicalEndpoint === ep
+                ? 'bg-green-50 border-green-400 text-green-800 font-medium'
+                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+            }`}>
+              <input
+                type="radio"
+                name="clinicalEndpoint"
+                checked={clinicalEndpoint === ep}
+                onChange={() => setClinicalEndpoint(ep)}
+                className="w-4 h-4 text-green-600 focus:ring-green-500"
+              />
+              {ep}
+            </label>
+          ))}
+        </div>
+      </SectionCard>
 
+      {/* ── Section 6: Comments ───────────────────────────────────────── */}
+      <SectionCard title="Notes" icon={<MessageSquare className="w-4 h-4 text-slate-500" />}>
+        <div className="space-y-4">
+          <div>
+            <Label>Clinical Notes</Label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={3}
+              placeholder="Post-treatment observations, patient feedback..."
+              className="w-full mt-1.5 rounded-lg border border-slate-300 px-3 py-2 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+            />
+          </div>
+          <div className="pt-3 border-t border-slate-100">
+            <Label>Internal Session Notes (Tech Only)</Label>
+            <p className="text-xs text-slate-500 mb-1.5">Saves and prepopulates for the next session.</p>
+            <textarea
+              value={techNotes}
+              onChange={e => setTechNotes(e.target.value)}
+              rows={2}
+              placeholder="Internal reminders for the next time this patient comes in..."
+              className="w-full rounded-lg border border-slate-300 bg-amber-50/50 px-3 py-2 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-y"
+            />
+          </div>
+        </div>
+          <div className="pt-3 border-t border-slate-100">
+            <button 
+              onClick={() => setShowNotesHistory(!showNotesHistory)}
+              className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              <ChevronDown className={`w-4 h-4 transition-transform ${showNotesHistory ? 'rotate-180' : ''}`} />
+              {showNotesHistory ? 'Hide' : 'View'} Notes History ({notesHistory.length} sessions)
+            </button>
+            {showNotesHistory && (
+              <div className="mt-3 space-y-3 max-h-64 overflow-y-auto">
+                {notesHistory.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">No previous notes found.</p>
+                ) : (
+                  notesHistory.map((h, i) => (
+                    <div key={i} className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-slate-500">Session {h.session_number}</span>
+                        <span className="text-xs text-slate-400">{new Date(h.treatment_date).toLocaleDateString()}</span>
+                      </div>
+                      {h.notes && (
+                        <div className="mb-2">
+                          <span className="text-xs font-semibold text-amber-700 uppercase">Clinical</span>
+                          <p className="text-sm text-slate-700 mt-0.5">{h.notes}</p>
+                        </div>
+                      )}
+                      {h.tech_notes && (
+                        <div>
+                          <span className="text-xs font-semibold text-purple-700 uppercase">Internal</span>
+                          <p className="text-sm text-slate-700 mt-0.5">{h.tech_notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+      </SectionCard>
+
+      {/* ── Section 7: Save ───────────────────────────────────────────── */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+          {error}
+        </div>
+      )}
+
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg px-4 py-3 flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" />
+          Treatment session saved successfully!
+        </div>
+      )}
+
+      <button
+        onClick={handleSave}
+        disabled={saving || areasTreated.length === 0}
+        className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300
+          text-white font-semibold py-3.5 rounded-xl shadow-sm transition-all text-sm uppercase tracking-wide"
+      >
+        {saving ? (
+          <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+        ) : (
+          <><Save className="w-4 h-4" /> Save Treatment Session</>
+        )}
+      </button>
+
+      {/* ── Intake Modal ───────────────────────────────────────────── */}
+      {showIntakeModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-indigo-500" />
+                Patient Intake Form
+              </h3>
+              <button onClick={() => setShowIntakeModal(false)} className="text-slate-400 hover:text-slate-600 bg-white rounded-full p-1 border border-slate-200">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 overflow-y-auto flex-1 space-y-6">
+              
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Demographics</h4>
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <div>
+                    <span className="block text-slate-500">Name</span>
+                    <span className="font-medium text-slate-900">{patient.first_name} {patient.last_name}</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-500">DOB</span>
+                    <span className="font-medium text-slate-900">{dob}</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-500">Phone</span>
+                    <span className="font-medium text-slate-900">{patient.phone || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-500">Email</span>
+                    <span className="font-medium text-slate-900">{patient.email || '—'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Medical History</h4>
+                {(() => {
+                  const history = patient.medical_history_json;
+                  if (!history || typeof history !== 'object') {
+                    return <p className="text-sm text-slate-500 italic">No medical history recorded.</p>;
+                  }
+                  
+                  const flagged = Object.entries(history).filter(([key, val]) => val === true && key !== 'medications');
+                  const medications = history.medications;
+
+                  return (
+                    <div className="space-y-3">
+                      {flagged.length > 0 ? (
+                        <div className="space-y-2">
+                          {flagged.map(([key]) => (
+                            <div key={key} className="flex items-start gap-2.5 text-sm bg-red-50 text-red-800 px-3 py-2 rounded-lg border border-red-100">
+                              <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                              <span className="font-medium">{MEDICAL_LABELS[key] || key}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-lg border border-green-100">
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                          <span className="font-medium">No medical contraindications flagged</span>
+                        </div>
+                      )}
+                      
+                      {medications && medications.trim() !== '' && (
+                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mt-3">
+                          <span className="block text-xs font-semibold text-blue-800 uppercase mb-1">Current Medications</span>
+                          <p className="text-sm text-blue-900">{medications}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Skin Profile</h4>
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <div>
+                    <span className="block text-slate-500">Fitzpatrick Type</span>
+                    <span className="font-medium text-slate-900">{patient.baseline_skin_type || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-slate-500">Ethnic Background</span>
+                    <span className="font-medium text-slate-900">{patient.ethnic_background || '—'}</span>
+                  </div>
+                </div>
+              </div>
+
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Agreements & Consents</h4>
+                <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-sm">
+                  <div className="flex items-center gap-2 text-green-700 font-medium mb-1">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Treatment Consent Signed</span>
+                  </div>
+                  <p className="text-slate-500 text-xs ml-6">
+                    Digitally signed and acknowledged on {new Date(patient.created_at).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
