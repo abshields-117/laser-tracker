@@ -161,6 +161,9 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
       prev.includes(ep) ? prev.filter(e => e !== ep) : [...prev, ep]
     );
 
+  // Consent state
+  const [consentOnFile, setConsentOnFile] = useState<{signed_at: string; service_type: string} | null>(null);
+
   // Notes
   const [notes, setNotes] = useState('');
   const [techNotes, setTechNotes] = useState('');
@@ -181,6 +184,18 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
         .single();
       setPatient(pt);
       setSkinTypeAtSession(pt?.baseline_skin_type || pt?.skin_type || '');
+
+      // Auto-detect consent on file from kiosk intake
+      const { data: consentData } = await supabase
+        .from('consent_records')
+        .select('id, signed_at, service_type')
+        .eq('patient_id', patientId)
+        .order('signed_at', { ascending: false })
+        .limit(1);
+      if (consentData && consentData.length > 0) {
+        setPreChecklist(p => ({ ...p, consentSigned: true }));
+        setConsentOnFile({ signed_at: consentData[0].signed_at, service_type: consentData[0].service_type });
+      }
 
       // Fetch active plan
       const { data: plans } = await supabase
@@ -456,7 +471,6 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           {([
             ['hairShaved', 'Hair closely shaved?'],
             ['areaCleaned', 'Treatment area cleaned and dry?'],
-            ['consentSigned', 'Consent form signed?'],
           ] as const).map(([key, label]) => (
             <label key={key} className="flex items-center gap-3 cursor-pointer">
               <input
@@ -468,6 +482,29 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
               <span className="text-sm text-slate-700">{label}</span>
             </label>
           ))}
+
+          {/* Consent — auto-detected from kiosk intake */}
+          {consentOnFile ? (
+            <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+              <div>
+                <span className="text-sm font-semibold text-green-800">Consent on file</span>
+                <span className="text-xs text-green-600 ml-2">
+                  Signed {new Date(consentOnFile.signed_at).toLocaleDateString()} · {consentOnFile.service_type || 'Laser'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={preChecklist.consentSigned}
+                onChange={() => setPreChecklist(p => ({ ...p, consentSigned: !p.consentSigned }))}
+                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm text-slate-700">Consent form signed? <span className="text-amber-600 font-medium">(not found in system — check paper copy)</span></span>
+            </label>
+          )}
 
           <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3">
             <Label>Skin Type Today (Fitzpatrick):</Label>
