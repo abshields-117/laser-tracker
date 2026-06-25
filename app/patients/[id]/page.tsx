@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useParams, useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft, User, FileText, Activity, Calendar, CheckCircle, ChevronDown } from 'lucide-react';
+import ConsentViewer from '@/components/ConsentViewer';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,7 @@ export default function PatientChartPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedTreatment, setExpandedTreatment] = useState<string | null>(null);
+  const [showConsent, setShowConsent] = useState(false);
 
   useEffect(() => {
     async function fetchChart() {
@@ -210,9 +212,17 @@ export default function PatientChartPage() {
                    );
                  })()}
                  <div className="pt-4 border-t border-slate-100">
-                   <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
-                     <CheckCircle className="w-4 h-4" />
-                     <span>Treatment Consent Signed</span>
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
+                       <CheckCircle className="w-4 h-4" />
+                       <span>Treatment Consent Signed</span>
+                     </div>
+                     <button
+                       onClick={() => setShowConsent(true)}
+                       className="text-xs text-blue-600 hover:text-blue-800 font-medium underline"
+                     >
+                       View / Download
+                     </button>
                    </div>
                    <p className="text-slate-500 text-xs ml-6 mt-1">
                      Digitally signed on {new Date(patient.created_at).toLocaleString()}
@@ -366,6 +376,13 @@ export default function PatientChartPage() {
 
         </div>
       </main>
+      {showConsent && patient && (
+        <ConsentViewer
+          patientId={id as string}
+          patientName={`${patient.first_name} ${patient.last_name}`}
+          onClose={() => setShowConsent(false)}
+        />
+      )}
     </div>
   );
 }

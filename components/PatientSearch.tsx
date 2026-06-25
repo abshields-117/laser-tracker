@@ -48,7 +48,7 @@ export default function PatientSearch({ onSelectPatient }: { onSelectPatient: (i
         </div>
         <input
           type="text"
-          className="block w-full pl-10 pr-3 py-4 border border-slate-300 rounded-xl leading-5 bg-white placeholder-slate-500 focus:outline-none focus:placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-lg shadow-sm"
+          className="block w-full pl-10 pr-3 py-4 border border-slate-300 rounded-xl leading-5 bg-white text-slate-900 placeholder-slate-500 focus:outline-none focus:placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-lg shadow-sm"
           placeholder="Search by name or phone..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}

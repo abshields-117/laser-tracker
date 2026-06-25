@@ -13,8 +13,6 @@ export default function IntakeForm() {
     firstName: '', lastName: '', dob: '', email: '', phone: '',
     ethnicBackground: '',
     skinType: 'III',
-    desiredPackage: '',
-    desiredPackageOther: '',
     medical: {
       selfTanner: false,
       sunExposure: false,
@@ -37,12 +35,6 @@ export default function IntakeForm() {
     },
     signature: ''
   });
-
-  const packages = [
-    { group: "Female Packages", items: ["Smooth Face & Neck", "The Essential Duo", "The College Prep", "The Full Leg", "The Total Body"] },
-    { group: "Men's Packages", items: ["The Clean Neck", "The Athlete's Back", "Upper Body Complete"] },
-    { group: "Other", items: ["Other (Please specify)"] }
-  ];
 
   const medicalQuestions = [
     { key: 'selfTanner', label: 'Have you used any self tanner in the last 7 days?' },
@@ -82,7 +74,7 @@ export default function IntakeForm() {
         setValidationError('Please select a service type.');
         return;
       }
-      if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.dob || !formData.ethnicBackground || !formData.phone.trim() || !formData.email.trim() || !formData.desiredPackage) {
+      if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.dob || !formData.ethnicBackground || !formData.phone.trim() || !formData.email.trim()) {
         setValidationError('Please fill in all required fields before continuing.');
         return;
       }
@@ -334,34 +326,6 @@ export default function IntakeForm() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700">Package Desired</label>
-            <select 
-              className="w-full p-2 border rounded-md text-slate-900 bg-white text-base"
-              value={formData.desiredPackage}
-              onChange={e => setFormData({...formData, desiredPackage: e.target.value})}
-            >
-              <option value="">Select a package...</option>
-              {packages.map(group => (
-                <optgroup key={group.group} label={group.group}>
-                  {group.items.map(item => (
-                    <option key={item} value={item}>{item}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-
-          {formData.desiredPackage === 'Other (Please specify)' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Specify Package/Area</label>
-              <input 
-                type="text" className="w-full p-2 border rounded-md text-slate-900 text-base" 
-                value={formData.desiredPackageOther} onChange={e => setFormData({...formData, desiredPackageOther: e.target.value})}
-              />
-            </div>
-          )}
-
           {validationError && (
             <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">
               {validationError}
@@ -370,45 +334,6 @@ export default function IntakeForm() {
 
           <button onClick={handleNext} className="w-full mt-4 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 flex items-center justify-center gap-2 min-h-[52px]">            Next: Medical History <ChevronRight className="w-4 h-4" />
           </button>
-        </div>
-      )}
-
-      {/* Step 2: Medical History (Contraindications) */}
-      {step === 2 && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
-            Medical Safety Check
-          </h2>
-          <p className="text-sm text-slate-500">Please answer honestly for your safety.</p>
-
-          <div className="space-y-3">
-            {medicalQuestions.map(item => (
-              <label key={item.key} className="flex items-start gap-3 p-3 border border-slate-100 rounded-lg hover:bg-slate-50 cursor-pointer">
-                <input 
-                  type="checkbox" className="mt-1 w-6 h-6 text-blue-600 rounded"
-                  checked={(formData.medical as Record<string, boolean | string>)[item.key] as boolean}
-                  onChange={e => setFormData({...formData, medical: {...formData.medical, [item.key]: e.target.checked}})}
-                />
-                <span className="text-sm text-slate-700">{item.label}</span>
-              </label>
-            ))}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Current Medications</label>
-            <textarea 
-              className="w-full p-2 border rounded-md h-20 text-sm text-slate-900 text-base" 
-              placeholder="List all medications, vitamins, and supplements..."
-              value={formData.medical.medications}
-              onChange={e => setFormData({...formData, medical: {...formData.medical, medications: e.target.value}})}
-            ></textarea>
-          </div>
-
-          <div className="flex gap-4 mt-4">
-            <button onClick={handleBack} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-lg font-semibold hover:bg-slate-200 min-h-[52px]">Back</button>
-            <button onClick={handleNext} className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 min-h-[52px]">Next: Consent</button>
-          </div>
         </div>
       )}
 
