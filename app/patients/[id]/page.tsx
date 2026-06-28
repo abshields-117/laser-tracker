@@ -3,8 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useParams, useRouter } from 'next/navigation';
-import { Loader2, ArrowLeft, User, FileText, Activity, Calendar, CheckCircle, ChevronDown } from 'lucide-react';
+import { Loader2, ArrowLeft, User, FileText, Activity, CheckCircle, ChevronDown } from 'lucide-react';
 import ConsentViewer from '@/components/ConsentViewer';
+import PhotoGallery from '@/components/PhotoGallery';
 
 export const dynamic = 'force-dynamic';
 
@@ -375,6 +376,10 @@ export default function PatientChartPage() {
           </div>
 
         </div>
+
+        {/* Photo Gallery — full width below the grid */}
+        <PhotoGallery patientId={id as string} />
+
       </main>
       {showConsent && patient && (
         <ConsentViewer
