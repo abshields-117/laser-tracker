@@ -70,6 +70,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // Kiosk role enforcement — lock kiosk accounts to /kiosk only
+  const { data: roleData } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (roleData?.role === 'kiosk' && !request.nextUrl.pathname.startsWith('/kiosk')) {
+    return NextResponse.redirect(new URL('/kiosk', request.url))
+  }
+
   return response
 }
 
