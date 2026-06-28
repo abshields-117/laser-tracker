@@ -12,7 +12,7 @@ import IntakeForm from '@/components/IntakeForm';
 export const dynamic = 'force-dynamic';
 import { User, Activity, ShieldCheck, LogOut, FileText, Loader2 } from 'lucide-react';
 
-type UserRole = 'admin' | 'md' | 'tech' | null;
+type UserRole = 'admin' | 'md' | 'tech' | 'kiosk' | null;
 
 export default function Home() {
   const router = useRouter();
@@ -45,6 +45,11 @@ export default function Home() {
         } else {
           setUserRole(profile.role as UserRole);
           setUserName(profile.full_name ?? profile.email ?? 'User');
+          // Kiosk accounts go straight to the intake form — no dashboard
+          if (profile.role === 'kiosk') {
+            router.replace('/kiosk');
+            return;
+          }
         }
       } catch (err) {
         console.error('Auth error:', err);
@@ -68,6 +73,7 @@ export default function Home() {
       case 'admin': return 'Administrator';
       case 'md': return 'Medical Director';
       case 'tech': return 'Technician';
+      case 'kiosk': return 'Kiosk';
       default: return 'Staff';
     }
   };
