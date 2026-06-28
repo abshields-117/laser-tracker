@@ -436,8 +436,6 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
             </button>
             <a 
               href={`/patients/${patientId}`}
-              target="_blank"
-              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 text-xs font-bold px-3 py-1.5 rounded-full border border-teal-500/30 transition-colors no-underline"
             >
               <Activity className="w-3.5 h-3.5" />

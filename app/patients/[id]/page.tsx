@@ -88,7 +88,7 @@ export default function PatientChartPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center flex-col gap-4">
         <p className="text-red-500 font-medium">{error || "Patient not found"}</p>
-        <button onClick={() => router.back()} className="text-blue-600 hover:underline">Go Back</button>
+        <button onClick={() => router.push('/')} className="text-blue-600 hover:underline">Go Back</button>
       </div>
     );
   }
@@ -100,7 +100,7 @@ export default function PatientChartPage() {
       {/* Header Nav */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <button onClick={() => router.back()} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors font-medium text-sm">
+          <button onClick={() => router.push('/')} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 transition-colors font-medium text-sm">
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
           </button>
