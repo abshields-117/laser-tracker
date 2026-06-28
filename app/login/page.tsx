@@ -10,8 +10,6 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,36 +30,12 @@ export default function LoginPage() {
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: fullName } },
-      });
-      if (error) throw error;
-      setError(null);
-      setMode('login');
-      alert('Account created! You can now log in.');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Signup failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <main className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
       <div className="max-w-sm w-full space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Harlan Laser Tracker</h1>
-          <p className="mt-2 text-slate-400">
-            {mode === 'login' ? 'Sign in to continue' : 'Create your account'}
-          </p>
+          <p className="mt-2 text-slate-400">Staff access only — contact your admin to create an account</p>
         </div>
 
         {error && (
@@ -70,21 +44,7 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={mode === 'login' ? handleLogin : handleSignup} className="space-y-4">
-          {mode === 'signup' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Full Name</label>
-              <input
-                type="text"
-                required
-                value={fullName}
-                onChange={e => setFullName(e.target.value)}
-                className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                placeholder="Jane Doe"
-              />
-            </div>
-          )}
-
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
             <input
@@ -114,24 +74,12 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
+            {loading ? 'Please wait...' : 'Sign In'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-slate-500">
-          {mode === 'login' ? (
-            <>Don&apos;t have an account?{' '}
-              <button onClick={() => { setMode('signup'); setError(null); }} className="text-blue-400 hover:text-blue-300">
-                Sign up
-              </button>
-            </>
-          ) : (
-            <>Already have an account?{' '}
-              <button onClick={() => { setMode('login'); setError(null); }} className="text-blue-400 hover:text-blue-300">
-                Sign in
-              </button>
-            </>
-          )}
+        <p className="text-center text-xs text-slate-600">
+          Need access? Contact your administrator.
         </p>
       </div>
     </main>
