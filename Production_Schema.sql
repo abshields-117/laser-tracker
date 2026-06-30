@@ -74,9 +74,10 @@ create policy "Admins and MDs can view all patients" on public.patients for sele
 create policy "Admins and MDs can view all plans" on public.treatment_plans for select using (exists (select 1 from public.users where id = auth.uid() and role in ('admin', 'md')));
 create policy "Admins and MDs can view all treatments" on public.treatments for select using (exists (select 1 from public.users where id = auth.uid() and role in ('admin', 'md')));
 
-create policy "Techs can view their assigned patients" on public.patients for select using (exists (select 1 from public.treatment_plans where patient_id = patients.id and assigned_tech_id = auth.uid()));
-create policy "Techs can view their assigned plans" on public.treatment_plans for select using (assigned_tech_id = auth.uid());
-create policy "Techs can view treatments for assigned patients" on public.treatments for select using (exists (select 1 from public.treatment_plans where id = treatments.plan_id and assigned_tech_id = auth.uid()));
+-- All staff (tech/md/admin) can see all patients, plans, and treatments.
+create policy "All staff can view all patients" on public.patients for select using (exists (select 1 from public.users where id = auth.uid() and role in ('admin', 'md', 'tech')));
+create policy "All staff can view all plans" on public.treatment_plans for select using (exists (select 1 from public.users where id = auth.uid() and role in ('admin', 'md', 'tech')));
+create policy "All staff can view all treatments" on public.treatments for select using (exists (select 1 from public.users where id = auth.uid() and role in ('admin', 'md', 'tech')));
 create policy "Techs can insert treatments" on public.treatments for insert with check (tech_user_id = auth.uid());
 
 -- 6. AUDIT TRIGGER (Auto-create user profile)
