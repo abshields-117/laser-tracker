@@ -268,6 +268,15 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Re-check consent status when staff returns from the Re-Sign Consent tab
+  // (opened via window.open in the no-consent state below) so the block
+  // clears automatically the moment a signature is captured.
+  useEffect(() => {
+    const onFocus = () => { fetchData(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [fetchData]);
+
   // ─── Handlers ────────────────────────────────────────────────────────────
 
   const toggleArea = (area: string, list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>) => {
@@ -496,10 +505,11 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
             </div>
           ) : (
             <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-3 space-y-2">
-              <p className="text-sm font-semibold text-red-800">No digital consent on file for this patient.</p>
+              <p className="text-sm font-semibold text-red-800">No valid digital consent on file for this patient.</p>
               <p className="text-xs text-red-600">
-                Do not treat without a signed consent. Prefer collecting one digitally right now —
-                it takes under a minute and keeps the audit trail clean.
+                A signed digital consent is required before this session can be logged. Have the patient
+                re-sign now — it takes under a minute, and this checklist will unlock automatically once
+                it&apos;s saved.
               </p>
               <button
                 type="button"
@@ -508,18 +518,6 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
               >
                 Collect Consent Now
               </button>
-              <label className="flex items-start gap-3 cursor-pointer pt-1 border-t border-red-100 mt-1">
-                <input
-                  type="checkbox"
-                  checked={preChecklist.consentSigned}
-                  onChange={() => setPreChecklist(p => ({ ...p, consentSigned: !p.consentSigned }))}
-                  className="w-4 h-4 mt-0.5 rounded border-red-300 text-red-600 focus:ring-red-500"
-                />
-                <span className="text-sm text-red-900 font-medium">
-                  I have personally verified a signed paper consent exists for this patient and this session,
-                  and I am attesting to that under my own name for the audit record.
-                </span>
-              </label>
             </div>
           )}
 
@@ -893,7 +891,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
       {!preChecklist.consentSigned && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4" />
-          ⚠️ Cannot save session — Consent not confirmed on file.
+          ⚠️ Cannot save session — no valid digital consent on file. Collect one via the button above.
         </div>
       )}
 
