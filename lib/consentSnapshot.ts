@@ -28,7 +28,40 @@ interface ConsentSnapshotData {
   fitzpatrickType?: string;
 }
 
+/**
+ * Escape user-supplied text before interpolating it into the consent HTML
+ * snapshot. The snapshot is rendered in an iframe by staff (ConsentViewer),
+ * so unescaped patient input (name, signature, tattoo details…) would be a
+ * stored-XSS vector into authenticated staff sessions.
+ */
+function esc(value: string | undefined | null): string {
+  if (!value) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function generateConsentSnapshot(data: ConsentSnapshotData): string {
+  // Sanitize all free-text fields once, up front.
+  const data_raw = data;
+  data = {
+    ...data_raw,
+    patientName: esc(data_raw.patientName),
+    dob: esc(data_raw.dob),
+    phone: esc(data_raw.phone),
+    email: esc(data_raw.email),
+    signature: esc(data_raw.signature),
+    treatmentAreas: data_raw.treatmentAreas ? esc(data_raw.treatmentAreas) : data_raw.treatmentAreas,
+    fitzpatrickType: data_raw.fitzpatrickType ? esc(data_raw.fitzpatrickType) : data_raw.fitzpatrickType,
+    tattooColors: data_raw.tattooColors ? esc(data_raw.tattooColors) : data_raw.tattooColors,
+    tattooAge: data_raw.tattooAge ? esc(data_raw.tattooAge) : data_raw.tattooAge,
+    tattooLocation: data_raw.tattooLocation ? esc(data_raw.tattooLocation) : data_raw.tattooLocation,
+    tattooType: data_raw.tattooType ? esc(data_raw.tattooType) : data_raw.tattooType,
+    priorAttempts: data_raw.priorAttempts ? esc(data_raw.priorAttempts) : data_raw.priorAttempts,
+  };
   const formatDate = (isoString: string) => {
     const date = new Date(isoString);
     return date.toLocaleString('en-US', { 

@@ -71,35 +71,6 @@ export default function ConsentViewer({ consentId, consentHtml, patientId, patie
     }
   };
 
-  // Legacy method kept for compat
-  const loadConsent = async () => {
-    if (!consentId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const storedHtml = localStorage.getItem(`consent_${consentId}`);
-      
-      if (!storedHtml) {
-        // Try loading from consent_records
-        const records = JSON.parse(localStorage.getItem('consent_records') || '[]');
-        const record = records.find((r: any) => r.id === consentId);
-        
-        if (record && record.consent_html) {
-          setHtml(record.consent_html);
-        } else {
-          throw new Error('Consent document not found');
-        }
-      } else {
-        setHtml(storedHtml);
-      }
-    } catch (err) {
-      console.error('Error loading consent:', err);
-      setError('Failed to load consent document. It may have been deleted or is not available.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handlePrint = () => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
       iframeRef.current.contentWindow.print();
@@ -204,7 +175,10 @@ export default function ConsentViewer({ consentId, consentHtml, patientId, patie
               srcDoc={html}
               className="w-full h-full border-0"
               title="Consent Document"
-              sandbox="allow-same-origin allow-scripts"
+              // Consent snapshots are static documents — never execute scripts from
+              // stored HTML. allow-same-origin is required for the Print button
+              // (contentWindow.print()); allow-modals lets the print dialog open.
+              sandbox="allow-same-origin allow-modals"
             />
           )}
         </div>
