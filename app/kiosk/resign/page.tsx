@@ -73,7 +73,7 @@ function ResignConsentInner() {
         setLoadingPatients(true);
         const { data, error } = await supabase
           .from('patients')
-          .select('id, first_name, last_name, dob, date_of_birth, phone, baseline_skin_type')
+          .select('id, first_name, last_name, dob, phone, baseline_skin_type')
           .order('last_name', { ascending: true });
         if (error) throw error;
         setPatients(data || []);
