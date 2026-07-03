@@ -123,9 +123,9 @@ export default function PhotoGallery({ patientId }: { patientId: string }) {
 
       closeModal();
       await fetchPhotos();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Upload error:', err);
-      alert('Upload failed: ' + (err.message ?? 'Unknown error'));
+      alert('Upload failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setUploading(false);
     }
@@ -218,7 +218,7 @@ export default function PhotoGallery({ patientId }: { patientId: string }) {
             <p className="text-sm font-medium">
               {activeFilter === 'all' ? 'No photos yet' : `No "${activeFilter.replace('_', ' ')}" photos yet`}
             </p>
-            <p className="text-xs mt-1 opacity-70">Use "Take Photo" on the tablet or "Upload" to add the first one.</p>
+            <p className="text-xs mt-1 opacity-70">Use &ldquo;Take Photo&rdquo; on the tablet or &ldquo;Upload&rdquo; to add the first one.</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -229,7 +229,8 @@ export default function PhotoGallery({ patientId }: { patientId: string }) {
                 className="relative group rounded-xl overflow-hidden aspect-square border border-slate-200 hover:border-blue-400 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
                 {photo.signedUrl ? (
-                  <img src={photo.signedUrl} alt="Patient photo" className="w-full h-full object-cover" />
+                  /* eslint-disable-next-line @next/next/no-img-element -- signed, short-lived Supabase URLs; routing PHI photos through the Next image optimizer would re-expose/re-cache them */
+                  <img src={photo.signedUrl} alt={`Patient photo (${photo.category.replace('_', ' ')})`} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-slate-100 flex items-center justify-center">
                     <ImageOff className="w-6 h-6 text-slate-300" />
@@ -262,6 +263,7 @@ export default function PhotoGallery({ patientId }: { patientId: string }) {
               </button>
             </div>
 
+            {/* eslint-disable-next-line @next/next/no-img-element -- local data-URL preview */}
             <img
               src={pendingPreview}
               alt="Preview"
@@ -321,6 +323,7 @@ export default function PhotoGallery({ patientId }: { patientId: string }) {
 
             {/* Photo */}
             {selectedPhoto.signedUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element -- signed, short-lived Supabase URL */
               <img
                 src={selectedPhoto.signedUrl}
                 alt="Patient photo"
@@ -344,7 +347,7 @@ export default function PhotoGallery({ patientId }: { patientId: string }) {
                   })}
                 </p>
                 {selectedPhoto.notes && (
-                  <p className="text-sm text-white/80 mt-1 italic">"{selectedPhoto.notes}"</p>
+                  <p className="text-sm text-white/80 mt-1 italic">&ldquo;{selectedPhoto.notes}&rdquo;</p>
                 )}
               </div>
 

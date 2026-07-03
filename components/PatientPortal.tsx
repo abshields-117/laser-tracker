@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { User, Activity, Calendar } from 'lucide-react';
+import { Activity, Calendar } from 'lucide-react';
 
 export default function PatientPortal() {
   const patient = {
@@ -40,7 +40,7 @@ export default function PatientPortal() {
         <div className="w-full bg-slate-100 rounded-full h-3 mb-2">
           <div className="bg-blue-500 h-3 rounded-full transition-all duration-500" style={{ width: `${(patient.progress / patient.total) * 100}%` }}></div>
         </div>
-        <p className="text-xs text-center text-slate-400">You're halfway there! ✨</p>
+        <p className="text-xs text-center text-slate-400">You&apos;re halfway there! ✨</p>
       </div>
 
       {/* Next Appt */}
