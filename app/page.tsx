@@ -210,7 +210,7 @@ export default function Home() {
         <div>
           <button 
             onClick={() => setView('search')}
-            className="absolute top-4 right-4 text-sm text-blue-600 font-medium hover:text-blue-800 z-50"
+            className="absolute top-4 right-4 text-sm text-blue-700 font-medium hover:text-blue-900 z-50 bg-white/80 backdrop-blur-sm border border-slate-200 rounded-full px-4 py-2 shadow-sm min-h-[44px]"
           >
             Switch Patient
           </button>
