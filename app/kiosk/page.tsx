@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import IntakeForm from '@/components/IntakeForm';
 import { supabase } from '@/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
-import { LogOut } from 'lucide-react';
+import { LogOut, FileSignature } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,11 +33,20 @@ export default function KioskPage() {
     <div className="min-h-screen bg-slate-900 flex flex-col">
       {/* Header — triple-tap to reveal sign-out */}
       <div
-        className="bg-slate-900 p-4 text-center border-b border-slate-800 select-none"
+        className="bg-slate-900 p-4 text-center border-b border-slate-800 select-none relative"
         onPointerDown={handleHeaderTap}
       >
         <h1 className="text-xl font-bold tracking-tight text-white">Harlan Esthetics</h1>
         <p className="text-xs text-slate-400 mt-1">Patient Intake Portal</p>
+        {/* Staff-only: find an existing patient missing a digital consent and capture it now.
+            Kept low-key (not patient-facing CTA) — hand the iPad over after selecting the patient. */}
+        <button
+          onClick={(e) => { e.stopPropagation(); router.push('/kiosk/resign'); }}
+          className="absolute right-3 top-3 flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1.5 rounded-lg transition-colors"
+        >
+          <FileSignature className="w-3.5 h-3.5" />
+          Re-Sign Consent
+        </button>
       </div>
 
       <div className="flex-1 bg-slate-50 overflow-auto">

@@ -495,15 +495,32 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
               </div>
             </div>
           ) : (
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={preChecklist.consentSigned}
-                onChange={() => setPreChecklist(p => ({ ...p, consentSigned: !p.consentSigned }))}
-                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-slate-700">Consent form signed? <span className="text-amber-600 font-medium">(not found in system — check paper copy)</span></span>
-            </label>
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-3 space-y-2">
+              <p className="text-sm font-semibold text-red-800">No digital consent on file for this patient.</p>
+              <p className="text-xs text-red-600">
+                Do not treat without a signed consent. Prefer collecting one digitally right now —
+                it takes under a minute and keeps the audit trail clean.
+              </p>
+              <button
+                type="button"
+                onClick={() => window.open(`/kiosk/resign?patientId=${patientId}`, '_blank')}
+                className="text-xs font-semibold bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md"
+              >
+                Collect Consent Now
+              </button>
+              <label className="flex items-start gap-3 cursor-pointer pt-1 border-t border-red-100 mt-1">
+                <input
+                  type="checkbox"
+                  checked={preChecklist.consentSigned}
+                  onChange={() => setPreChecklist(p => ({ ...p, consentSigned: !p.consentSigned }))}
+                  className="w-4 h-4 mt-0.5 rounded border-red-300 text-red-600 focus:ring-red-500"
+                />
+                <span className="text-sm text-red-900 font-medium">
+                  I have personally verified a signed paper consent exists for this patient and this session,
+                  and I am attesting to that under my own name for the audit record.
+                </span>
+              </label>
+            </div>
           )}
 
           <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3">
