@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useParams, useRouter } from 'next/navigation';
-import { Loader2, ArrowLeft, User, FileText, Activity, CheckCircle, ChevronDown } from 'lucide-react';
+import { Loader2, ArrowLeft, User, FileText, Activity, CheckCircle, ChevronDown, AlertTriangle } from 'lucide-react';
 import ConsentViewer from '@/components/ConsentViewer';
 import PhotoGallery from '@/components/PhotoGallery';
 
@@ -24,6 +24,8 @@ export default function PatientChartPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedTreatment, setExpandedTreatment] = useState<string | null>(null);
   const [showConsent, setShowConsent] = useState(false);
+  const [consentRecord, setConsentRecord] = useState<{ signed_at: string; source?: string } | null>(null);
+  const [consentLoading, setConsentLoading] = useState(true);
 
   useEffect(() => {
     async function fetchChart() {
@@ -64,6 +66,26 @@ export default function PatientChartPage() {
             
           if (tError) throw tError;
           setTreatments(tData || []);
+        }
+
+        // 4. Check for an actual signed consent record — do NOT assume one exists.
+        // Historically this chart showed a hardcoded "Consent Signed" checkmark with a
+        // fabricated date for every patient, which was wrong and misleading. Only show
+        // green when a real consent_records row is found.
+        try {
+          const { data: cData } = await supabase
+            .from('consent_records')
+            .select('signed_at, source')
+            .eq('patient_id', id)
+            .order('signed_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          setConsentRecord(cData || null);
+        } catch (consentErr) {
+          console.error('Error checking consent record:', consentErr);
+          setConsentRecord(null);
+        } finally {
+          setConsentLoading(false);
         }
 
       } catch (err: any) {
@@ -111,7 +133,26 @@ export default function PatientChartPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 mt-8 space-y-8">
-        
+
+        {/* Hard-to-miss consent warning — do not treat until resolved */}
+        {!consentLoading && !consentRecord && (
+          <div className="bg-red-600 text-white rounded-2xl px-6 py-4 shadow-lg flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-7 h-7 flex-shrink-0" />
+              <div>
+                <p className="font-bold text-lg leading-tight">No Consent On File — Do Not Treat</p>
+                <p className="text-red-100 text-sm">Collect a signed consent before starting any session for this patient.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => router.push(`/kiosk/resign?patientId=${id}&returnTo=/patients/${id}`)}
+              className="bg-white text-red-700 font-semibold px-4 py-2 rounded-lg hover:bg-red-50 whitespace-nowrap"
+            >
+              Collect Consent Now
+            </button>
+          </div>
+        )}
+
         {/* Patient Header Card */}
         <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-5">
@@ -213,21 +254,44 @@ export default function PatientChartPage() {
                    );
                  })()}
                  <div className="pt-4 border-t border-slate-100">
-                   <div className="flex items-center justify-between">
-                     <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
-                       <CheckCircle className="w-4 h-4" />
-                       <span>Treatment Consent Signed</span>
+                   {consentLoading ? (
+                     <div className="flex items-center gap-2 text-slate-400 text-sm">
+                       <Loader2 className="w-4 h-4 animate-spin" />
+                       <span>Checking consent status...</span>
                      </div>
-                     <button
-                       onClick={() => setShowConsent(true)}
-                       className="text-xs text-blue-600 hover:text-blue-800 font-medium underline"
-                     >
-                       View / Download
-                     </button>
-                   </div>
-                   <p className="text-slate-500 text-xs ml-6 mt-1">
-                     Digitally signed on {new Date(patient.created_at).toLocaleString()}
-                   </p>
+                   ) : consentRecord ? (
+                     <>
+                       <div className="flex items-center justify-between">
+                         <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
+                           <CheckCircle className="w-4 h-4" />
+                           <span>Treatment Consent Signed</span>
+                         </div>
+                         <button
+                           onClick={() => setShowConsent(true)}
+                           className="text-xs text-blue-600 hover:text-blue-800 font-medium underline"
+                         >
+                           View / Download
+                         </button>
+                       </div>
+                       <p className="text-slate-500 text-xs ml-6 mt-1">
+                         Digitally signed on {new Date(consentRecord.signed_at).toLocaleString()}
+                         {consentRecord.source === 're_sign' ? ' (re-signed in app)' : ''}
+                       </p>
+                     </>
+                   ) : (
+                     <div className="flex items-center justify-between gap-3">
+                       <div className="flex items-center gap-2 text-red-700 font-semibold text-sm">
+                         <AlertTriangle className="w-4 h-4" />
+                         <span>No Consent On File</span>
+                       </div>
+                       <button
+                         onClick={() => router.push(`/kiosk/resign?patientId=${id}&returnTo=/patients/${id}`)}
+                         className="text-xs bg-red-600 hover:bg-red-700 text-white font-semibold px-3 py-1.5 rounded-md"
+                       >
+                         Collect Consent Now
+                       </button>
+                     </div>
+                   )}
                  </div>
               </div>
             </div>
