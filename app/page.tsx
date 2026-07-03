@@ -9,10 +9,12 @@ import MedicalDirectorDashboard from '@/components/MedicalDirectorDashboard';
 import PatientPortal from '@/components/PatientPortal';
 import IntakeForm from '@/components/IntakeForm';
 
-export const dynamic = 'force-dynamic';
-import { User, Activity, ShieldCheck, LogOut, FileText, Loader2 } from 'lucide-react';
+import { User, ShieldCheck, LogOut, FileText, Loader2, ArrowLeft } from 'lucide-react';
+import type { UserRole as Role } from '@/lib/types';
 
-type UserRole = 'admin' | 'md' | 'tech' | 'kiosk' | null;
+export const dynamic = 'force-dynamic';
+
+type UserRole = Role | null;
 
 export default function Home() {
   const router = useRouter();
@@ -39,8 +41,9 @@ export default function Home() {
 
         if (error) {
           console.error('Failed to fetch profile:', error);
-          // Fallback to auth metadata
-          setUserRole('tech');
+          // Fail closed: without a confirmed role, only the intake form is
+          // offered (no patient lookup / MD dashboard buttons).
+          setUserRole(null);
           setUserName(user.email ?? 'User');
         } else {
           setUserRole(profile.role as UserRole);
@@ -185,10 +188,11 @@ export default function Home() {
       <div className="absolute top-4 left-4 z-50 flex items-center gap-3">
         <button 
           onClick={() => setView('home')}
-          className="bg-white/80 backdrop-blur-sm p-2 rounded-full shadow-sm hover:bg-slate-100 border border-slate-200 text-slate-500"
+          className="bg-white/80 backdrop-blur-sm p-3 rounded-full shadow-sm hover:bg-slate-100 border border-slate-200 text-slate-500"
           title="Back to Home"
+          aria-label="Back to Home"
         >
-          <LogOut className="w-5 h-5" />
+          <ArrowLeft className="w-5 h-5" />
         </button>
         <span className="text-xs text-slate-400 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full border border-slate-200">
           {roleLabel(userRole)}
@@ -206,7 +210,7 @@ export default function Home() {
         <div>
           <button 
             onClick={() => setView('search')}
-            className="absolute top-4 right-4 text-sm text-blue-600 font-medium hover:text-blue-800 z-50"
+            className="absolute top-4 right-4 text-sm text-blue-700 font-medium hover:text-blue-900 z-50 bg-white/80 backdrop-blur-sm border border-slate-200 rounded-full px-4 py-2 shadow-sm min-h-[44px]"
           >
             Switch Patient
           </button>

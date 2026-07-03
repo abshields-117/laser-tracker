@@ -4,25 +4,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import {
   Save, User, Zap, Sun, Loader2, CheckCircle2, ClipboardCheck,
-  Activity, MessageSquare, ChevronDown, Shield, Square, Circle, FileText, X, AlertTriangle,
+  Activity, MessageSquare, ChevronDown, Square, Circle, FileText, X, AlertTriangle,
 } from 'lucide-react';
+import { Patient, TreatmentPlan, Treatment, AreasTreatedJson, MEDICAL_LABELS, formatDob } from '@/lib/types';
 
-// ─── Constants
-
-const MEDICAL_LABELS: Record<string, string> = {
-  selfTanner: 'Self tanner in last 7 days',
-  sunExposure: 'Prolonged sun exposure (last 4 weeks)',
-  accutane: 'Accutane in last 6 months',
-  pregnant: 'Currently pregnant or breastfeeding',
-  recentBirth: 'Given birth in last 12 months',
-  photosensitive: 'Photosensitive meds / retinol / retin-a',
-  antibiotics: 'Currently taking antibiotics',
-  herpesSimplex: 'History of Herpes Simplex',
-  keloids: 'History of keloid scarring',
-  tattoos: 'Tattoos/permanent makeup in treatment area',
-  cancer: 'History of skin cancer',
-};
-// ───────────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const PICO_PROBES = ['Universal (Silver)', 'Honeycomb (755nm)', 'Carbon Peeling'];
 const PICO_WAVELENGTHS = ['1064nm', '755nm', '532nm'];
@@ -104,8 +90,8 @@ const NumberInput = ({ value, onChange, placeholder, className = '' }: {
 // ─── Component// ───────────────────────────────────────────────────────────────
 
 export default function SessionLogger({ patientId, onSaveSuccess }: { patientId: string | null, onSaveSuccess?: () => void }) {
-  const [patient, setPatient] = useState<any>(null);
-  const [plan, setPlan] = useState<any>(null);
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [plan, setPlan] = useState<TreatmentPlan | null>(null);
   const [packageName, setPackageName] = useState<string>('Standard Package');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -220,7 +206,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           .order('session_number', { ascending: false })
           .limit(1);
 
-        const prev = treatments?.[0];
+        const prev: Treatment | undefined = treatments?.[0];
         if (prev) {
           setSessionNum(prev.session_number + 1);
           setTechNotes(prev.tech_notes || '');
@@ -233,7 +219,8 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           .order('session_number', { ascending: false });
         if (historyData) setNotesHistory(historyData.filter(h => h.notes || h.tech_notes));
           // Pre-populate parameters from previous session
-          const prevAreas = prev.areas_treated as any;
+          const prevAreas = prev.areas_treated as AreasTreatedJson | string[] | null;
+          const prevParams = (!Array.isArray(prevAreas) && prevAreas?.params) || {};
           setParams(p => ({
             ...p,
             spotSize: prev.spot_size ?? '',
@@ -241,15 +228,18 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
             pulseWidthAlex: prev.pulse_width_ms?.toString() ?? '',
             pulseWidthYag: prev.pulse_width_ms?.toString() ?? '',
             coolingLevel: prev.cooling_setting ?? 'Medium',
-            machineUsed: prev.machine_used ?? 'Splendor X',
+            machineUsed: (prev.machine_used === 'PicoKing' ? 'PicoKing' : 'Splendor X') as TreatmentParams['machineUsed'],
             picoProbe: prev.pico_probe ?? 'Universal (Silver)',
             picoWavelength: prev.pico_wavelength ?? '1064nm',
             picoMode: prev.pico_mode ?? 'Standard',
             picoFreq: prev.pico_frequency_hz?.toString() ?? '',
             // Preserve wavelength/shape from areas_treated jsonb if stored
-            ...(prevAreas?.params ?? {}),
+            wavelength: prevParams.wavelength ?? p.wavelength,
+            spotShape: (prevParams.spotShape === 'Round' ? 'Round' : prevParams.spotShape === 'Square' ? 'Square' : p.spotShape) as TreatmentParams['spotShape'],
+            repRate: prevParams.repRate ?? p.repRate,
+            numPulses: prevParams.numPulses ?? p.numPulses,
           }));
-          if (Array.isArray(prevAreas?.areas)) {
+          if (!Array.isArray(prevAreas) && Array.isArray(prevAreas?.areas)) {
             setAreasTreated(prevAreas.areas);
           } else if (Array.isArray(prevAreas)) {
             setAreasTreated(prevAreas);
@@ -259,8 +249,8 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           setTechNotes('');
         }
       }
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to load patient data.');
     } finally {
       setLoading(false);
     }
@@ -293,6 +283,10 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
       setError("Please specify the 'Other' area.");
       return;
     }
+    if (areasTreated.length === 0 && !(showOtherArea && otherArea.trim())) {
+      setError('Please select at least one treatment area.');
+      return;
+    }
     if (!skinTypeAtSession) {
       setError("Please select the patient's Skin Type Today.");
       return;
@@ -318,6 +312,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           .select()
           .single();
         if (planErr) throw planErr;
+        if (!newPlan) throw new Error('Failed to create a treatment plan.');
         activePlan = newPlan;
         setPlan(newPlan);
       } else if (activePlan.package_name !== packageName) {
@@ -328,6 +323,8 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           .eq('id', activePlan.id);
         if (planUpdateErr) throw planUpdateErr;
       }
+
+      if (!activePlan) throw new Error('No active treatment plan available.');
 
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -355,7 +352,12 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           },
         },
         spot_size: params.spotSize || null,
-        fluence_jcm2: params.fluenceTotal ? parseFloat(params.fluenceTotal) : null,
+        // Splendor X records fluence in fluenceTotal; the PicoKing UI captures it
+        // in fluenceAlex — both persist to the same fluence_jcm2 column.
+        fluence_jcm2: (() => {
+          const f = params.machineUsed === 'PicoKing' ? params.fluenceAlex : params.fluenceTotal;
+          return f ? parseFloat(f) : null;
+        })(),
         pulse_width_ms: params.pulseWidthAlex ? parseFloat(params.pulseWidthAlex) : null,
         cooling_setting: params.coolingLevel,
         machine_used: params.machineUsed,
@@ -378,8 +380,8 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
         setSuccess(false);
         if (onSaveSuccess) onSaveSuccess();
       }, 2000);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to save session.');
     } finally {
       setSaving(false);
     }
@@ -406,10 +408,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
     );
   }
 
-  const totalSessions = plan?.total_sessions ?? 8;
-  const dob = patient.dob
-    ? new Date(patient.dob).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : '—';
+  const dob = formatDob(patient);
 
   // ─── Main Render ────────────────────────────────────────────────────────
 
@@ -890,8 +889,8 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
       {/* ── Section 7: Save ───────────────────────────────────────────── */}
       {!preChecklist.consentSigned && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4" />
-          ⚠️ Cannot save session — no valid digital consent on file. Collect one via the button above.
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          Cannot save session — no valid digital consent on file. Collect one via the button above.
         </div>
       )}
 
@@ -910,7 +909,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
 
       <button
         onClick={handleSave}
-        disabled={saving || areasTreated.length === 0 || !preChecklist.consentSigned}
+        disabled={saving || (areasTreated.length === 0 && !(showOtherArea && otherArea.trim())) || !preChecklist.consentSigned}
         className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300
           text-white font-semibold py-3.5 rounded-xl shadow-sm transition-all text-sm uppercase tracking-wide min-h-[52px]"
       >
@@ -987,7 +986,7 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
                         </div>
                       )}
                       
-                      {medications && medications.trim() !== '' && (
+                      {typeof medications === 'string' && medications.trim() !== '' && (
                         <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mt-3">
                           <span className="block text-xs font-semibold text-blue-800 uppercase mb-1">Current Medications</span>
                           <p className="text-sm text-blue-900">{medications}</p>
@@ -1015,15 +1014,23 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
 
               <div>
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Agreements & Consents</h4>
-                <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-sm">
-                  <div className="flex items-center gap-2 text-green-700 font-medium mb-1">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Treatment Consent Signed</span>
+                {/* Reflect the REAL consent_records status — never fabricate a signed date. */}
+                {consentOnFile ? (
+                  <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 text-sm">
+                    <div className="flex items-center gap-2 text-green-700 font-medium mb-1">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Treatment Consent Signed</span>
+                    </div>
+                    <p className="text-slate-500 text-xs ml-6">
+                      Digitally signed on {new Date(consentOnFile.signed_at).toLocaleString()} · {consentOnFile.service_type || 'Laser'}
+                    </p>
                   </div>
-                  <p className="text-slate-500 text-xs ml-6">
-                    Digitally signed and acknowledged on {new Date(patient.created_at).toLocaleString()}
-                  </p>
-                </div>
+                ) : (
+                  <div className="bg-red-50 border border-red-100 rounded-lg p-3 text-sm flex items-center gap-2 text-red-700 font-medium">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>No digital consent on file</span>
+                  </div>
+                )}
               </div>
 
             </div>

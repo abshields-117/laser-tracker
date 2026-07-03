@@ -73,7 +73,7 @@ function ResignConsentInner() {
         setLoadingPatients(true);
         const { data, error } = await supabase
           .from('patients')
-          .select('*')
+          .select('id, first_name, last_name, dob, date_of_birth, phone, baseline_skin_type')
           .order('last_name', { ascending: true });
         if (error) throw error;
         setPatients(data || []);
@@ -155,7 +155,7 @@ function ResignConsentInner() {
 
       if (insertError) throw insertError;
 
-      try { localStorage.setItem(`consent_${consentId}`, consentHtml); } catch { /* ignore */ }
+      // No localStorage caching — shared kiosk device, PHI must not persist locally.
 
       setStep('done');
     } catch (err: unknown) {

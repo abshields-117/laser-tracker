@@ -6,12 +6,23 @@ import { useParams, useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft, User, FileText, Activity, CheckCircle, ChevronDown, AlertTriangle } from 'lucide-react';
 import ConsentViewer from '@/components/ConsentViewer';
 import PhotoGallery from '@/components/PhotoGallery';
+import { Patient, TreatmentPlan, Treatment, AreasTreatedJson, formatDob, MEDICAL_LABELS } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-type Patient = any;
-type TreatmentPlan = any;
-type Treatment = any;
+/** Pull the per-session params snapshot out of the areas_treated jsonb (new shape only). */
+function treatmentParams(t: Treatment): AreasTreatedJson['params'] {
+  const at = t.areas_treated;
+  if (at && !Array.isArray(at) && typeof at === 'object') return at.params ?? {};
+  return {};
+}
+
+function treatmentAreasLabel(t: Treatment): string {
+  const at = t.areas_treated;
+  if (at && !Array.isArray(at) && Array.isArray(at.areas) && at.areas.length > 0) return at.areas.join(', ');
+  if (Array.isArray(at) && at.length > 0) return at.join(', ');
+  return t.body_area || 'No area recorded';
+}
 
 export default function PatientChartPage() {
   const { id } = useParams();
@@ -88,9 +99,9 @@ export default function PatientChartPage() {
           setConsentLoading(false);
         }
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Error fetching chart:', err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : 'Failed to load chart.');
       } finally {
         setLoading(false);
       }
@@ -161,20 +172,25 @@ export default function PatientChartPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-900">{patient.first_name} {patient.last_name}</h1>
-              <p className="text-slate-500">DOB: {new Date(patient.date_of_birth).toLocaleDateString()} • {patient.phone}</p>
+              <p className="text-slate-500">DOB: {formatDob(patient)}{patient.phone ? ` • ${patient.phone}` : ''}</p>
             </div>
           </div>
           <div className="flex gap-3">
             <div className="px-4 py-2 bg-slate-100 rounded-lg border border-slate-200">
               <span className="block text-xs text-slate-500 uppercase font-semibold">Fitzpatrick</span>
-              <span className="block text-lg font-bold text-slate-800 text-center">Type {patient.skin_type_fitzpatrick || 'N/A'}</span>
+              <span className="block text-lg font-bold text-slate-800 text-center">Type {patient.baseline_skin_type || patient.skin_type || 'N/A'}</span>
             </div>
-            <div className={`px-4 py-2 rounded-lg border ${patient.photosensitive_meds ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
-              <span className="block text-xs uppercase font-semibold text-center mb-0.5" style={{ color: patient.photosensitive_meds ? '#ef4444' : '#10b981' }}>Meds</span>
-              <span className="block text-sm font-bold text-center" style={{ color: patient.photosensitive_meds ? '#991b1b' : '#065f46' }}>
-                {patient.photosensitive_meds ? 'Flagged' : 'Clear'}
-              </span>
-            </div>
+            {(() => {
+              const flagged = patient.medical_history_json?.photosensitive === true;
+              return (
+                <div className={`px-4 py-2 rounded-lg border ${flagged ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                  <span className={`block text-xs uppercase font-semibold text-center mb-0.5 ${flagged ? 'text-red-500' : 'text-emerald-500'}`}>Photosensitive Meds</span>
+                  <span className={`block text-sm font-bold text-center ${flagged ? 'text-red-800' : 'text-emerald-800'}`}>
+                    {flagged ? 'Flagged' : 'Clear'}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -193,18 +209,18 @@ export default function PatientChartPage() {
                     <div className="mb-4">
                       <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider bg-blue-50 px-2 py-1 rounded-md">{activePlan.status}</span>
                     </div>
-                    <h3 className="text-lg font-bold text-slate-900">{activePlan.package_type || 'Custom Plan'}</h3>
-                    <p className="text-slate-500 text-sm mt-1">Started: {new Date(activePlan.start_date).toLocaleDateString()}</p>
+                    <h3 className="text-lg font-bold text-slate-900">{activePlan.package_name || 'Custom Plan'}</h3>
+                    <p className="text-slate-500 text-sm mt-1">Started: {activePlan.start_date ? new Date(activePlan.start_date).toLocaleDateString() : (activePlan.created_at ? new Date(activePlan.created_at).toLocaleDateString() : '—')}</p>
                     
                     <div className="mt-6">
                       <div className="flex justify-between text-sm font-medium mb-2">
                         <span className="text-slate-700">Progress</span>
-                        <span className="text-slate-900">{activePlan.sessions_completed} / {activePlan.total_sessions}</span>
+                        <span className="text-slate-900">{treatments.filter(t => t.plan_id === activePlan.id).length} / {activePlan.total_sessions || '—'}</span>
                       </div>
                       <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
                         <div 
                           className="bg-blue-600 h-2.5 rounded-full transition-all duration-500" 
-                          style={{ width: `${Math.min(100, (activePlan.sessions_completed / activePlan.total_sessions) * 100)}%` }}
+                          style={{ width: `${Math.min(100, (treatments.filter(t => t.plan_id === activePlan.id).length / (activePlan.total_sessions || 1)) * 100)}%` }}
                         ></div>
                       </div>
                     </div>
@@ -227,14 +243,15 @@ export default function PatientChartPage() {
                      return <p className="text-sm text-slate-500 italic">No medical history recorded.</p>;
                    }
                    const flagged = Object.entries(history).filter(([key, val]) => val === true && key !== 'medications');
-                   const medications = (history as any).medications;
+                   const medications = (history as Record<string, unknown>).medications;
                    return (
                      <div className="space-y-3">
                        {flagged.length > 0 ? (
                          <div className="space-y-2">
                            {flagged.map(([key]) => (
                              <div key={key} className="flex items-center gap-2 text-sm text-red-700 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
-                               <span className="font-medium">{key}</span>
+                               <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                               <span className="font-medium">{MEDICAL_LABELS[key] || key}</span>
                              </div>
                            ))}
                          </div>
@@ -244,7 +261,7 @@ export default function PatientChartPage() {
                            <span className="font-medium">No medical contraindications flagged</span>
                          </div>
                        )}
-                       {medications && String(medications).trim() !== '' && (
+                       {typeof medications === 'string' && medications.trim() !== '' && (
                          <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
                            <span className="block text-xs font-semibold text-blue-800 uppercase mb-1">Current Medications</span>
                            <p className="text-sm text-blue-900">{String(medications)}</p>
@@ -329,22 +346,17 @@ export default function PatientChartPage() {
                             <div className="flex items-center gap-2 flex-wrap">
                               {/* Parse area string gracefully (legacy body_area vs new areas_treated jsonb) */}
                               <span className="font-semibold text-slate-900 text-sm">
-                                {(() => {
-                                  if (t.areas_treated && Array.isArray(t.areas_treated.areas) && t.areas_treated.areas.length > 0) {
-                                    return t.areas_treated.areas.join(', ');
-                                  }
-                                  if (t.areas_treated && Array.isArray(t.areas_treated) && t.areas_treated.length > 0) {
-                                    return t.areas_treated.join(', ');
-                                  }
-                                  return t.body_area || 'No area recorded';
-                                })()}
+                                {treatmentAreasLabel(t)}
                               </span>
                               <span className="text-slate-400 text-xs">•</span>
                               <span className="text-xs text-slate-500">{new Date(t.treatment_date).toLocaleDateString()}</span>
                             </div>
                             <div className="flex items-center gap-3 mt-1 flex-wrap">
-                              {t.wavelength && (
-                                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{t.wavelength}</span>
+                              {treatmentParams(t)?.wavelength && (
+                                <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">{treatmentParams(t)?.wavelength}</span>
+                              )}
+                              {t.machine_used && (
+                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">{t.machine_used}</span>
                               )}
                               {t.fluence_jcm2 && (
                                 <span className="text-xs text-slate-500">{t.fluence_jcm2} J/cm²</span>
@@ -375,27 +387,27 @@ export default function PatientChartPage() {
                               </div>
                               <div className="bg-white rounded-lg p-3 border border-slate-100">
                                 <span className="block text-xs text-slate-400 mb-1">Spot Shape</span>
-                                <span className="font-mono font-semibold text-slate-800">{t.spot_shape || '-'}</span>
+                                <span className="font-mono font-semibold text-slate-800">{treatmentParams(t)?.spotShape || '-'}</span>
                               </div>
                               <div className="bg-white rounded-lg p-3 border border-slate-100">
                                 <span className="block text-xs text-slate-400 mb-1">Wavelength</span>
-                                <span className="font-mono font-semibold text-slate-800">{t.wavelength || '-'}</span>
+                                <span className="font-mono font-semibold text-slate-800">{treatmentParams(t)?.wavelength || t.pico_wavelength || '-'}</span>
                               </div>
                               <div className="bg-white rounded-lg p-3 border border-slate-100">
                                 <span className="block text-xs text-slate-400 mb-1">Rep Rate</span>
-                                <span className="font-mono font-semibold text-slate-800">{t.rep_rate ? t.rep_rate + ' Hz' : '-'}</span>
+                                <span className="font-mono font-semibold text-slate-800">{treatmentParams(t)?.repRate ? treatmentParams(t)?.repRate + ' Hz' : (t.pico_frequency_hz ? t.pico_frequency_hz + ' Hz' : '-')}</span>
                               </div>
                               <div className="bg-white rounded-lg p-3 border border-slate-100">
                                 <span className="block text-xs text-slate-400 mb-1">Cooling</span>
-                                <span className="font-mono font-semibold text-slate-800">{t.cooling_level || '-'}</span>
+                                <span className="font-mono font-semibold text-slate-800">{t.cooling_setting || '-'}</span>
                               </div>
                               <div className="bg-white rounded-lg p-3 border border-slate-100">
-                                <span className="block text-xs text-slate-400 mb-1">Pulse Duration (Alex)</span>
-                                <span className="font-mono font-semibold text-slate-800">{t.pulse_width_alex ? t.pulse_width_alex + ' ms' : '-'}</span>
+                                <span className="block text-xs text-slate-400 mb-1">Pulse Duration</span>
+                                <span className="font-mono font-semibold text-slate-800">{t.pulse_width_ms ? t.pulse_width_ms + ' ms' : '-'}</span>
                               </div>
                               <div className="bg-white rounded-lg p-3 border border-slate-100">
-                                <span className="block text-xs text-slate-400 mb-1">Pulse Duration (YAG)</span>
-                                <span className="font-mono font-semibold text-slate-800">{t.pulse_width_yag ? t.pulse_width_yag + ' ms' : '-'}</span>
+                                <span className="block text-xs text-slate-400 mb-1">Machine</span>
+                                <span className="font-mono font-semibold text-slate-800">{t.machine_used || '-'}</span>
                               </div>
                               <div className="bg-white rounded-lg p-3 border border-slate-100">
                                 <span className="block text-xs text-slate-400 mb-1">Shots Fired</span>

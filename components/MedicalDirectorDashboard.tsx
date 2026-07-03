@@ -7,25 +7,14 @@ import ConsentViewer from './ConsentViewer';
 import { useRouter } from 'next/navigation';
 import PatientSearch from './PatientSearch';
 import { Users } from 'lucide-react';
+import { Patient, Treatment, MedicalHistory, MEDICAL_LABELS, formatDob } from '@/lib/types';
 
-const MEDICAL_LABELS: Record<string, string> = {
-  selfTanner: 'Self tanner in last 7 days',
-  sunExposure: 'Prolonged sun exposure (last 4 weeks)',
-  accutane: 'Accutane in last 6 months',
-  pregnant: 'Currently pregnant or breastfeeding',
-  recentBirth: 'Given birth in last 12 months',
-  photosensitive: 'Photosensitive meds / retinol / retin-a',
-  antibiotics: 'Currently taking antibiotics',
-  herpesSimplex: 'History of Herpes Simplex',
-  keloids: 'History of keloid scarring',
-  tattoos: 'Tattoos/permanent makeup in treatment area',
-  cancer: 'History of skin cancer',
-};
+type AuditPatient = Patient & { latestTreatment: Treatment | null };
 
 export default function MedicalDirectorDashboard() {
   const router = useRouter();
-  const [queue, setQueue] = useState<any[]>([]);
-  const [auditQueue, setAuditQueue] = useState<any[]>([]);
+  const [queue, setQueue] = useState<Patient[]>([]);
+  const [auditQueue, setAuditQueue] = useState<AuditPatient[]>([]);
   const [loading, setLoading] = useState(true);
   const [auditLoading, setAuditLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -129,7 +118,7 @@ export default function MedicalDirectorDashboard() {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const renderMedicalHistory = (history: any) => {
+  const renderMedicalHistory = (history: MedicalHistory | null | undefined) => {
     if (!history || typeof history !== 'object') return <p className="text-sm text-slate-400 italic">No medical history recorded.</p>;
 
     const flagged = Object.entries(history).filter(([key, val]) => val === true && key !== 'medications');
@@ -152,7 +141,7 @@ export default function MedicalDirectorDashboard() {
             <span>No medical contraindications flagged</span>
           </div>
         )}
-        {medications && medications.trim() !== '' && (
+        {typeof medications === 'string' && medications.trim() !== '' && (
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
             <span className="block text-xs font-semibold text-blue-800 uppercase mb-1">Current Medications</span>
             <p className="text-sm text-blue-900">{medications}</p>
@@ -235,7 +224,7 @@ export default function MedicalDirectorDashboard() {
                             {item.first_name} {item.last_name}
                           </h3>
                           <p className="text-sm text-slate-500">
-                            DOB: {item.dob ? new Date(item.dob + 'T00:00:00').toLocaleDateString() : 'N/A'}
+                            DOB: {formatDob(item)}
                             {item.phone && <> • {item.phone}</>}
                             {item.email && <> • {item.email}</>}
                           </p>
@@ -309,15 +298,17 @@ export default function MedicalDirectorDashboard() {
                         </div>
                       ) : (
                         <div className="flex gap-2">
+                          {/* Two-step approve: first tap arms the confirm UI. Prevents an
+                              accidental single tap from clearing a patient on the iPad. */}
                           <button 
-                            onClick={() => handleApprove(item.id)}
-                            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-sm flex items-center gap-2 justify-center text-sm"
+                            onClick={() => setApproveMode({ id: item.id, withNote: false })}
+                            className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-sm flex items-center gap-2 justify-center text-sm min-h-[44px]"
                           >
-                            <CheckCircle className="w-4 h-4" /> Approve ✓
+                            <CheckCircle className="w-4 h-4" /> Approve
                           </button>
                           <button 
                             onClick={() => setApproveMode({ id: item.id, withNote: true })}
-                            className="px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 font-semibold rounded-lg text-xs border border-green-300"
+                            className="px-3 py-2.5 bg-green-100 hover:bg-green-200 text-green-700 font-semibold rounded-lg text-xs border border-green-300 min-h-[44px]"
                           >
                             + Note
                           </button>
@@ -345,7 +336,7 @@ export default function MedicalDirectorDashboard() {
                           </div>
                           <div>
                             <span className="block text-xs text-slate-500 font-semibold uppercase">DOB</span>
-                            <span className="text-slate-900 font-medium">{item.dob ? new Date(item.dob + 'T00:00:00').toLocaleDateString() : 'N/A'}</span>
+                            <span className="text-slate-900 font-medium">{formatDob(item)}</span>
                           </div>
                           <div>
                             <span className="block text-xs text-slate-500 font-semibold uppercase">Phone</span>
@@ -442,7 +433,7 @@ export default function MedicalDirectorDashboard() {
                             {item.first_name} {item.last_name}
                           </h3>
                           <p className="text-sm text-slate-500">
-                            DOB: {item.dob ? new Date(item.dob + 'T00:00:00').toLocaleDateString() : 'N/A'}
+                            DOB: {formatDob(item)}
                             {item.phone && <> • {item.phone}</>}
                           </p>
                         </div>

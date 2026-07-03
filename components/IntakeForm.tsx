@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { AlertTriangle, CheckCircle, FileText, ChevronRight } from 'lucide-react';
 import CherryFinancing from '@/components/CherryFinancing';
-import { generateConsentSnapshot } from '../lib/consentSnapshot';
+import { generateConsentSnapshot } from '@/lib/consentSnapshot';
 import ConsentSignStep from '@/components/ConsentSignStep';
 
 export default function IntakeForm() {
@@ -79,6 +79,15 @@ export default function IntakeForm() {
         setValidationError('Please fill in all required fields before continuing.');
         return;
       }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+        setValidationError('Please enter a valid email address.');
+        return;
+      }
+      const dobDate = new Date(formData.dob + 'T00:00:00');
+      if (isNaN(dobDate.getTime()) || dobDate > new Date() || dobDate.getFullYear() < 1900) {
+        setValidationError('Please enter a valid date of birth.');
+        return;
+      }
     }
     setStep(step + 1);
   };
@@ -146,8 +155,10 @@ export default function IntakeForm() {
         console.warn('Consent storage upload failed, saving inline.');
       }
 
-      // 4. Save consent record (immutable legal record)
-      await supabase.from('consent_records').insert({
+      // 4. Save consent record (immutable legal record).
+      // This MUST NOT fail silently — SessionLogger's hard block depends on a
+      // real consent_records row existing for this patient.
+      const { error: consentError } = await supabase.from('consent_records').insert({
         id: consentId,
         patient_id: patientData?.id ?? null,
         patient_name: `${formData.firstName} ${formData.lastName}`,
@@ -159,9 +170,11 @@ export default function IntakeForm() {
         checkboxes_json: formData.consent,
         fitzpatrick_type: formData.skinType,
       });
-
-      // 5. Fallback: also save to localStorage in case of any DB issue
-      try { localStorage.setItem(`consent_${consentId}`, consentHtml); } catch { /* ignore */ }
+      if (consentError) {
+        throw new Error(`Your info was saved, but the signed consent could not be recorded (${consentError.message}). Please hand the iPad back to staff.`);
+      }
+      // NOTE: we intentionally do NOT cache consent HTML in localStorage — this
+      // runs on a shared kiosk iPad and PHI must not persist on the device.
 
       setSubmitted(true);
     } catch (err: unknown) {
@@ -363,7 +376,7 @@ export default function IntakeForm() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Current Medications</label>
             <textarea 
-              className="w-full p-2 border rounded-md h-20 text-sm text-slate-900 text-base" 
+              className="w-full p-2 border rounded-md h-20 text-slate-900 text-base" 
               placeholder="List all medications, vitamins, and supplements..."
               value={formData.medical.medications}
               onChange={e => setFormData({...formData, medical: {...formData.medical, medications: e.target.value}})}

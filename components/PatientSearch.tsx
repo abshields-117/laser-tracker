@@ -3,24 +3,30 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { Search, User, ChevronRight, Loader2 } from 'lucide-react';
+import { Patient, formatDob } from '@/lib/types';
 
 export default function PatientSearch({ onSelectPatient }: { onSelectPatient: (id: string) => void }) {
   const [query, setQuery] = useState('');
-  const [patients, setPatients] = useState<any[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchPatients() {
       try {
         setLoading(true);
+        setFetchError(null);
+        // Only pull the columns the list actually renders — avoids shipping
+        // full medical history for every patient to the search screen.
         const { data, error } = await supabase
           .from('patients')
-          .select('*')
+          .select('id, first_name, last_name, dob, date_of_birth, phone, created_at')
           .order('last_name', { ascending: true });
         if (error) throw error;
-        setPatients(data || []);
+        setPatients((data as Patient[]) || []);
       } catch (err) {
         console.error('Error fetching patients:', err);
+        setFetchError('Could not load the patient list. Check the connection and try again.');
       } finally {
         setLoading(false);
       }
@@ -55,6 +61,12 @@ export default function PatientSearch({ onSelectPatient }: { onSelectPatient: (i
         />
       </div>
 
+      {fetchError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+          {fetchError}
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="p-12 flex justify-center">
@@ -83,7 +95,7 @@ export default function PatientSearch({ onSelectPatient }: { onSelectPatient: (i
                       {patient.first_name} {patient.last_name}
                     </h3>
                     <div className="text-sm text-slate-500 mt-1 flex items-center gap-2">
-                      <span>DOB: {new Date(patient.date_of_birth).toLocaleDateString()}</span>
+                      <span>DOB: {formatDob(patient)}</span>
                       {patient.phone && (
                         <>
                           <span className="text-slate-300">•</span>
