@@ -2,10 +2,15 @@
  * Shared row types for the Supabase tables this app reads/writes.
  *
  * NOTE: the production schema has drifted from the SQL files in the repo
- * root — some columns exist under two names depending on when the row was
- * created (e.g. patients.dob vs patients.date_of_birth). Fields that may be
- * absent on older rows are optional here, and `patientDob()` below is the
- * single canonical way to read a patient's date of birth.
+ * root. Verified directly against live Supabase on 2026-07-03:
+ * `patients.dob` is the ONLY real DOB column in production —
+ * `date_of_birth` never existed as a column at all (it was a bad guess in
+ * an earlier fix; selecting it in a Supabase `.select()` call causes
+ * PostgREST to reject the whole query with a 400, which silently breaks
+ * patient search/lookup). It's kept below as an optional, always-undefined
+ * fallback purely so `patientDob()`/`formatDob()` don't need call-site
+ * changes if a legacy alias column is ever actually added later — do NOT
+ * add `date_of_birth` to any `.select()` string.
  */
 
 export interface MedicalHistory {
