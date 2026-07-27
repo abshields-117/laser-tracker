@@ -182,21 +182,34 @@ export default function Home() {
 
   // App Layout for other views
   return (
-    <main className="min-h-screen bg-slate-50 relative">
-      
-      {/* Top Nav */}
-      <div className="absolute top-4 left-4 z-50 flex items-center gap-3">
-        <button 
-          onClick={() => setView('home')}
-          className="bg-white/80 backdrop-blur-sm p-3 rounded-full shadow-sm hover:bg-slate-100 border border-slate-200 text-slate-500"
-          title="Back to Home"
-          aria-label="Back to Home"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <span className="text-xs text-slate-400 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-full border border-slate-200">
-          {roleLabel(userRole)}
-        </span>
+    <main className="min-h-screen bg-slate-50">
+
+      {/* Top Nav Bar — sticky, takes real space in the layout flow so it
+          never covers page content (was `absolute`, which on narrow mobile
+          viewports overlapped the patient name/DOB and the Switch Patient
+          button collided with SessionLogger's own header buttons). */}
+      <div className="sticky top-0 z-50 flex items-center justify-between gap-3 bg-white/90 backdrop-blur-sm border-b border-slate-200 px-4 py-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <button 
+            onClick={() => setView('home')}
+            className="flex-shrink-0 bg-slate-100 hover:bg-slate-200 p-2.5 rounded-full text-slate-500"
+            title="Back to Home"
+            aria-label="Back to Home"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <span className="flex-shrink-0 text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-full">
+            {roleLabel(userRole)}
+          </span>
+        </div>
+        {view === 'logger' && (
+          <button 
+            onClick={() => setView('search')}
+            className="flex-shrink-0 text-sm text-blue-700 font-medium hover:text-blue-900 bg-blue-50 border border-blue-200 rounded-full px-4 py-2 min-h-[44px]"
+          >
+            Switch Patient
+          </button>
+        )}
       </div>
 
       {view === 'search' && (
@@ -207,13 +220,7 @@ export default function Home() {
       )}
 
       {view === 'logger' && (
-        <div>
-          <button 
-            onClick={() => setView('search')}
-            className="absolute top-4 right-4 text-sm text-blue-700 font-medium hover:text-blue-900 z-50 bg-white/80 backdrop-blur-sm border border-slate-200 rounded-full px-4 py-2 shadow-sm min-h-[44px]"
-          >
-            Switch Patient
-          </button>
+        <div className="pt-4">
           <SessionLogger patientId={selectedPatientId} onSaveSuccess={() => setView('search')} />
         </div>
       )}
