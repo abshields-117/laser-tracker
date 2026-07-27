@@ -20,7 +20,7 @@ export default function PatientSearch({ onSelectPatient }: { onSelectPatient: (i
         // full medical history for every patient to the search screen.
         const { data, error } = await supabase
           .from('patients')
-          .select('id, first_name, last_name, dob, date_of_birth, phone, created_at')
+          .select('id, first_name, last_name, dob, phone, created_at')
           .order('last_name', { ascending: true });
         if (error) throw error;
         setPatients((data as Patient[]) || []);
