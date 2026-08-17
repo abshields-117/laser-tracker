@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import {
   Save, User, Zap, Sun, Loader2, CheckCircle2, ClipboardCheck,
   Activity, MessageSquare, ChevronDown, Square, Circle, FileText, X, AlertTriangle,
+  History,
 } from 'lucide-react';
 import { Patient, TreatmentPlan, Treatment, AreasTreatedJson, MEDICAL_LABELS, formatDob } from '@/lib/types';
 
@@ -156,6 +157,10 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
   const [notesHistory, setNotesHistory] = useState<Array<{session_number: number; treatment_date: string; notes: string | null; tech_notes: string | null}>>([]);
   const [showNotesHistory, setShowNotesHistory] = useState(false);
 
+  // Treatment history (all sessions, full params)
+  const [treatmentHistory, setTreatmentHistory] = useState<Treatment[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
   // ─── Data Fetching ──────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
@@ -197,27 +202,33 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
         setPackageName(activePlan.package_name);
       }
 
-      // Fetch most recent treatment for pre-population
+      // Fetch all treatments for pre-population + history panel
       if (activePlan) {
         const { data: treatments } = await supabase
           .from('treatments')
           .select('*')
           .eq('plan_id', activePlan.id)
-          .order('session_number', { ascending: false })
-          .limit(1);
+          .order('session_number', { ascending: false });
 
-        const prev: Treatment | undefined = treatments?.[0];
+        const allTreatments: Treatment[] = treatments || [];
+        setTreatmentHistory(allTreatments);
+        // Derive notes history from the same query (avoids a second round-trip)
+        setNotesHistory(
+          allTreatments
+            .filter(h => h.notes || h.tech_notes)
+            .map(h => ({
+              session_number: h.session_number,
+              treatment_date: h.treatment_date,
+              notes: h.notes ?? null,
+              tech_notes: h.tech_notes ?? null,
+            }))
+        );
+
+        const prev: Treatment | undefined = allTreatments[0];
         if (prev) {
           setSessionNum(prev.session_number + 1);
           setTechNotes(prev.tech_notes || '');
 
-        // Fetch notes history
-        const { data: historyData } = await supabase
-          .from('treatments')
-          .select('session_number, treatment_date, notes, tech_notes')
-          .eq('plan_id', activePlan.id)
-          .order('session_number', { ascending: false });
-        if (historyData) setNotesHistory(historyData.filter(h => h.notes || h.tech_notes));
           // Pre-populate parameters from previous session
           const prevAreas = prev.areas_treated as AreasTreatedJson | string[] | null;
           const prevParams = (!Array.isArray(prevAreas) && prevAreas?.params) || {};
@@ -819,6 +830,182 @@ export default function SessionLogger({ patientId, onSaveSuccess }: { patientId:
           ))}
         </div>
       </SectionCard>
+
+      {/* ── Section 5b: Previous Sessions History ─────────────────────── */}
+      {treatmentHistory.length > 0 && (
+        <SectionCard title="Previous Sessions" icon={<History className="w-4 h-4 text-slate-500" />}>
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform ${showHistory ? 'rotate-180' : ''}`} />
+            {showHistory ? 'Hide' : 'Show'} treatment history ({treatmentHistory.length} session{treatmentHistory.length !== 1 ? 's' : ''})
+          </button>
+
+          {showHistory && (
+            <div className="mt-4 space-y-3 max-h-[480px] overflow-y-auto">
+              {treatmentHistory.map((t) => {
+                const areas = (() => {
+                  if (!t.areas_treated) return [];
+                  if (Array.isArray(t.areas_treated)) return t.areas_treated as string[];
+                  const at = t.areas_treated as AreasTreatedJson;
+                  return at.areas || [];
+                })();
+
+                const isPico = t.machine_used === 'PicoKing';
+
+                return (
+                  <div key={t.id} className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
+                    {/* Row header */}
+                    <div className="flex items-center justify-between px-4 py-2 bg-slate-100 border-b border-slate-200">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                          Session {t.session_number}
+                        </span>
+                        <span
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            isPico
+                              ? 'bg-purple-100 text-purple-700'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}
+                        >
+                          {t.machine_used || 'Splendor X'}
+                        </span>
+                        {t.skin_type_at_session && (
+                          <span className="text-xs text-slate-500">Fitz {t.skin_type_at_session}</span>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-400">
+                        {new Date(t.treatment_date).toLocaleDateString('en-US', {
+                          month: 'short', day: 'numeric', year: 'numeric',
+                        })}
+                      </span>
+                    </div>
+
+                    {/* Params grid */}
+                    <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
+                      {/* Areas */}
+                      {areas.length > 0 && (
+                        <div className="col-span-2 sm:col-span-3">
+                          <span className="text-slate-400 uppercase tracking-wider font-semibold">Areas · </span>
+                          <span className="text-slate-700">{areas.join(', ')}</span>
+                        </div>
+                      )}
+
+                      {/* Splendor X params */}
+                      {!isPico && (
+                        <>
+                          {t.fluence_jcm2 != null && (
+                            <div>
+                              <span className="text-slate-400 block">Fluence</span>
+                              <span className="font-mono font-semibold text-slate-800">{t.fluence_jcm2} J/cm²</span>
+                            </div>
+                          )}
+                          {t.spot_size && (
+                            <div>
+                              <span className="text-slate-400 block">Spot</span>
+                              <span className="font-mono font-semibold text-slate-800">{t.spot_size} mm</span>
+                            </div>
+                          )}
+                          {t.cooling_setting && (
+                            <div>
+                              <span className="text-slate-400 block">Cooling</span>
+                              <span className="font-mono font-semibold text-slate-800">{t.cooling_setting}</span>
+                            </div>
+                          )}
+                          {t.pulse_width_ms != null && (
+                            <div>
+                              <span className="text-slate-400 block">Pulse Width</span>
+                              <span className="font-mono font-semibold text-slate-800">{t.pulse_width_ms} ms</span>
+                            </div>
+                          )}
+                          {(t.shots_fired_alex != null || t.shots_fired_yag != null) && (
+                            <div>
+                              <span className="text-slate-400 block">Shots (Alex/YAG)</span>
+                              <span className="font-mono font-semibold text-slate-800">
+                                {t.shots_fired_alex ?? '—'} / {t.shots_fired_yag ?? '—'}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* PicoKing params */}
+                      {isPico && (
+                        <>
+                          {t.pico_probe && (
+                            <div>
+                              <span className="text-slate-400 block">Probe</span>
+                              <span className="font-semibold text-slate-800">{t.pico_probe}</span>
+                            </div>
+                          )}
+                          {t.pico_wavelength && (
+                            <div>
+                              <span className="text-slate-400 block">Wavelength</span>
+                              <span className="font-mono font-semibold text-slate-800">{t.pico_wavelength}</span>
+                            </div>
+                          )}
+                          {t.pico_mode && (
+                            <div>
+                              <span className="text-slate-400 block">Mode</span>
+                              <span className="font-semibold text-slate-800">{t.pico_mode}</span>
+                            </div>
+                          )}
+                          {t.pico_frequency_hz != null && (
+                            <div>
+                              <span className="text-slate-400 block">Frequency</span>
+                              <span className="font-mono font-semibold text-slate-800">{t.pico_frequency_hz} Hz</span>
+                            </div>
+                          )}
+                          {t.fluence_jcm2 != null && (
+                            <div>
+                              <span className="text-slate-400 block">Fluence</span>
+                              <span className="font-mono font-semibold text-slate-800">{t.fluence_jcm2} J/cm²</span>
+                            </div>
+                          )}
+                          {t.cooling_setting && (
+                            <div>
+                              <span className="text-slate-400 block">Cooling</span>
+                              <span className="font-mono font-semibold text-slate-800">{t.cooling_setting}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {/* Clinical endpoint */}
+                      {t.clinical_endpoint && (
+                        <div className="col-span-2 sm:col-span-3">
+                          <span className="text-slate-400 uppercase tracking-wider font-semibold">Endpoint · </span>
+                          <span className="text-slate-700">{t.clinical_endpoint}</span>
+                        </div>
+                      )}
+
+                      {/* Sun exposure warning */}
+                      {t.sun_exposure_check && (
+                        <div className="col-span-2 sm:col-span-3 flex items-center gap-1 text-amber-600">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span className="font-semibold">Sun exposure noted</span>
+                          {t.sun_exposed_areas && t.sun_exposed_areas.length > 0 && (
+                            <span className="text-amber-500"> — {t.sun_exposed_areas.join(', ')}</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Notes snippet */}
+                      {t.notes && (
+                        <div className="col-span-2 sm:col-span-3 pt-1 border-t border-slate-200 mt-1">
+                          <span className="text-slate-400 uppercase tracking-wider font-semibold">Notes · </span>
+                          <span className="text-slate-600 italic">{t.notes}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </SectionCard>
+      )}
 
       {/* ── Section 6: Comments ───────────────────────────────────────── */}
       <SectionCard title="Notes" icon={<MessageSquare className="w-4 h-4 text-slate-500" />}>
