@@ -17,7 +17,7 @@ export default function MedicalDirectorDashboard() {
   const [auditQueue, setAuditQueue] = useState<AuditPatient[]>([]);
   const [loading, setLoading] = useState(true);
   const [auditLoading, setAuditLoading] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedIntake, setSelectedIntake] = useState<Patient | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'audit' | 'all'>('pending');
   const [consentViewer, setConsentViewer] = useState<{ patientName: string; patientId: string } | null>(null);
   const [approveMode, setApproveMode] = useState<{ id: string; withNote: boolean } | null>(null);
@@ -114,8 +114,8 @@ export default function MedicalDirectorDashboard() {
     setAuditQueue(auditQueue.filter(p => p.id !== id));
   };
 
-  const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
+  const handleViewIntake = (patient: Patient) => {
+    setSelectedIntake(patient);
   };
 
   const renderMedicalHistory = (history: MedicalHistory | null | undefined) => {
@@ -251,12 +251,11 @@ export default function MedicalDirectorDashboard() {
                     
                     <div className="flex flex-col gap-2 flex-shrink-0">
                       <button 
-                        onClick={() => toggleExpand(item.id)}
+                        onClick={() => handleViewIntake(item)}
                         className="px-4 py-2 text-sm text-slate-600 font-medium hover:bg-slate-100 rounded-lg border border-slate-200 flex items-center gap-2 justify-center"
                       >
                         <FileText className="w-4 h-4" />
                         Intake Details
-                        {expandedId === item.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
                       <button 
                         onClick={() => router.push(`/patients/${item.id}`)}
@@ -318,60 +317,6 @@ export default function MedicalDirectorDashboard() {
                   </div>
                 </div>
 
-                {/* Expanded Intake Details */}
-                {expandedId === item.id && (
-                  <div className="px-6 pb-6 border-t border-slate-100 bg-slate-50/50">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                      
-                      {/* Left: Demographics */}
-                      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-                        <h4 className="font-bold text-slate-800 flex items-center gap-2 text-sm uppercase tracking-wider">
-                          <User className="w-4 h-4 text-slate-400" />
-                          Patient Demographics
-                        </h4>
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <span className="block text-xs text-slate-500 font-semibold uppercase">Name</span>
-                            <span className="text-slate-900 font-medium">{item.first_name} {item.last_name}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-slate-500 font-semibold uppercase">DOB</span>
-                            <span className="text-slate-900 font-medium">{formatDob(item)}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-slate-500 font-semibold uppercase">Phone</span>
-                            <span className="text-slate-900 font-medium">{item.phone || 'N/A'}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-slate-500 font-semibold uppercase">Email</span>
-                            <span className="text-slate-900 font-medium">{item.email || 'N/A'}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-slate-500 font-semibold uppercase">Ethnic Background</span>
-                            <span className="text-slate-900 font-medium">{item.ethnic_background || 'Not specified'}</span>
-                          </div>
-                          <div>
-                            <span className="block text-xs text-slate-500 font-semibold uppercase">Skin Type</span>
-                            <span className="text-slate-900 font-medium">Fitzpatrick Type {item.baseline_skin_type || 'N/A'}</span>
-                          </div>
-                        </div>
-                        <div>
-                          <span className="block text-xs text-slate-500 font-semibold uppercase mb-1">Intake Submitted</span>
-                          <span className="text-slate-900 text-sm font-medium">{new Date(item.created_at).toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      {/* Right: Medical History */}
-                      <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4">
-                        <h4 className="font-bold text-slate-800 flex items-center gap-2 text-sm uppercase tracking-wider">
-                          <AlertTriangle className="w-4 h-4 text-amber-500" />
-                          Medical History & Contraindications
-                        </h4>
-                        {renderMedicalHistory(item.medical_history_json)}
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -493,6 +438,75 @@ export default function MedicalDirectorDashboard() {
           patientId={consentViewer.patientId}
           onClose={() => setConsentViewer(null)}
         />
+      )}
+
+      {/* Slide-over for Intake Details */}
+      {selectedIntake && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setSelectedIntake(null)} />
+          <div className="relative w-full max-w-xl h-full bg-slate-50 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-right duration-300">
+            <div className="bg-white border-b border-slate-200 p-6 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">{selectedIntake.first_name} {selectedIntake.last_name}</h2>
+                <p className="text-sm text-slate-500">Intake Details</p>
+              </div>
+              <button onClick={() => setSelectedIntake(null)} className="p-2 text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors">
+                <ChevronDown className="w-5 h-5 rotate-90" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Demographics */}
+              <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-sm">
+                <h4 className="font-bold text-slate-800 flex items-center gap-2 text-sm uppercase tracking-wider">
+                  <User className="w-4 h-4 text-slate-400" />
+                  Patient Demographics
+                </h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="block text-xs text-slate-500 font-semibold uppercase">DOB</span>
+                    <span className="text-slate-900 font-medium">{formatDob(selectedIntake)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-slate-500 font-semibold uppercase">Phone</span>
+                    <span className="text-slate-900 font-medium">{selectedIntake.phone || 'N/A'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="block text-xs text-slate-500 font-semibold uppercase">Email</span>
+                    <span className="text-slate-900 font-medium">{selectedIntake.email || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-slate-500 font-semibold uppercase">Ethnic Background</span>
+                    <span className="text-slate-900 font-medium">{selectedIntake.ethnic_background || 'Not specified'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-slate-500 font-semibold uppercase">Skin Type</span>
+                    <span className="text-slate-900 font-medium">Fitzpatrick Type {selectedIntake.baseline_skin_type || 'N/A'}</span>
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-slate-100">
+                  <span className="block text-xs text-slate-500 font-semibold uppercase mb-1">Intake Submitted</span>
+                  <span className="text-slate-900 text-sm font-medium">{new Date(selectedIntake.created_at).toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* Medical History */}
+              <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-sm">
+                <h4 className="font-bold text-slate-800 flex items-center gap-2 text-sm uppercase tracking-wider">
+                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                  Medical History & Contraindications
+                </h4>
+                {renderMedicalHistory(selectedIntake.medical_history_json)}
+              </div>
+            </div>
+            
+            <div className="bg-white border-t border-slate-200 p-6">
+              <button onClick={() => setSelectedIntake(null)} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

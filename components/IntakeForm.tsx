@@ -204,18 +204,46 @@ export default function IntakeForm() {
   }
 
   return (
-    <div className="max-w-xl mx-auto p-6 bg-slate-50 min-h-screen">
+    <div className="lg:grid lg:grid-cols-2 bg-slate-50 min-h-screen">
       
-      {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Patient Intake</h1>
-        <div className="flex justify-center gap-2 mt-2">
-          {[1, 2, 3].map(i => (
-            <div key={i} className={`h-2 w-8 rounded-full ${step >= i ? 'bg-blue-600' : 'bg-slate-200'}`}></div>
+      {/* Left Pane: Split-pane layout for landscape */}
+      <div className="hidden lg:flex flex-col justify-center p-12 bg-slate-100 border-r border-slate-200">
+        <h1 className="text-4xl font-bold text-slate-900 mb-6">Patient Intake</h1>
+        <p className="text-slate-500 mb-12 text-lg">Please complete your medical history and consent forms. Your safety is our priority.</p>
+        
+        <div className="flex flex-col gap-6">
+          {[
+            { num: 1, title: 'Personal Details', desc: 'Basic info and contact' },
+            { num: 2, title: 'Medical History', desc: 'Safety screening' },
+            { num: 3, title: 'Consent', desc: 'Treatment agreement' }
+          ].map(s => (
+            <div key={s.num} className={`flex items-start gap-4 p-4 rounded-xl ${step === s.num ? 'bg-blue-100 border border-blue-200 shadow-sm' : step > s.num ? 'opacity-60' : 'opacity-40'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${step >= s.num ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-600'}`}>
+                {step > s.num ? '✓' : s.num}
+              </div>
+              <div>
+                <h3 className={`font-bold ${step === s.num ? 'text-blue-900' : 'text-slate-700'}`}>{s.title}</h3>
+                <p className={`text-sm ${step === s.num ? 'text-blue-700' : 'text-slate-500'}`}>{s.desc}</p>
+              </div>
+            </div>
           ))}
         </div>
-        <p className="text-sm text-slate-500 mt-2">Step {step} of 3</p>
       </div>
+
+      {/* Right Pane: Active Form Fields */}
+      <div className="p-6 lg:p-12 lg:overflow-y-auto flex items-start justify-center">
+        <div className="w-full max-w-xl">
+          
+          {/* Header (Mobile Only) */}
+          <div className="text-center mb-8 lg:hidden">
+            <h1 className="text-2xl font-bold text-slate-900">Patient Intake</h1>
+            <div className="flex justify-center gap-2 mt-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className={`h-2 w-8 rounded-full ${step >= i ? 'bg-blue-600' : 'bg-slate-200'}`}></div>
+              ))}
+            </div>
+            <p className="text-sm text-slate-500 mt-2">Step {step} of 3</p>
+          </div>
 
       {/* Step 1: Personal Info */}
       {step === 1 && (
@@ -406,6 +434,8 @@ export default function IntakeForm() {
         />
       )}
 
+        </div>
+      </div>
     </div>
   );
 }
